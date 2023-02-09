@@ -9,6 +9,11 @@ from numpy.typing import ArrayLike
 logger = logging.getLogger(__name__)
 
 
+class MarketAgent(Agent):
+    longitude: float
+    latitude: float
+
+
 @dataclass
 class MarketProduct():
     delivery_start_time: datetime
@@ -71,6 +76,7 @@ d = datetime.now()
 today = datetime(d.year, d.month, d.day)
 
 
+
 @dataclass
 class MarketConfig:
     start_date: datetime  # start of delivery products
@@ -86,6 +92,10 @@ class MarketConfig:
     price_tick: float = 0.1 # steps in which the price can be increased
     continuous: bool = True # <- each market gets cleared "immediately", if a timeslot closes, the next one begins
     eligable_obligations_lambda: eligable_lambda
+    lambda: agent.payed_fee
+    # obligation should be time-based 
+    # nur regelenergie bieten wenn für die gleiche Stunde Regelleistung von diesem Agent gebraucht wurde
+
 
     # if not continous
     opening_hours: rrule.rrule  # dtstart must be relative to start_date
@@ -145,7 +155,9 @@ epex_intraday_trading_config = MarketConfig(
         MarketProduct('half-hourly', 48),
         MarketProduct('hourly', 24)
     ],
-    continuous=True,
+    continuous=True, # approximationsgrad
+    # wann zurück ziehen?
+    # Welche bedingungen gelten hierfür?
     amount_unit='0.1 MWh',
     price_unit='€/MWh',
     price_tick=0.01,
@@ -154,6 +166,7 @@ epex_intraday_trading_config = MarketConfig(
 )
 # pay as bid
 # publishes market results to TSO every 15 minutes
+# matching findet nur in eigener Regelzone für die letzen 15 Minuten statt - sonst mindestens 30 Minuten vorher
 
 
 # TerminHandel:
@@ -247,10 +260,12 @@ policy_trading_config = MarketConfig(
     price_tick=0.01,
     maximum_bid=9999,
     minimum_bid=-9999,
+    # laufzeit vs abrechnungszeitraum
 )
 
 # Control Reserve market
 # regelleistung kann 7 Tage lang geboten werden (überschneidende Gebots-Zeiträume)?
+# FCR
 market_start = today - timedelta(days=7) + timedelta(hours=10)
 control_reserve_trading_config = MarketConfig(
     today,
@@ -269,10 +284,10 @@ control_reserve_trading_config = MarketConfig(
 ) # pay-as-bid/merit-order one sided
 
 # RAM Regelarbeitsmarkt - Control Reserve
-market_start = today - timedelta(days=1) + timedelta(hours=12)
+market_start = today - timedelta(days=2) + timedelta(hours=12)
 control_work_trading_config = MarketConfig(
     today,
-    additional_fields=['eligable_lambda'], # eligable_lambda
+    additional_fields=['eligable_lambda'],
     available_market_products=[
         MarketProduct('quarter-hourly', 96),
     ],
@@ -284,9 +299,151 @@ control_work_trading_config = MarketConfig(
     price_tick=0.01,
     maximum_bid=9999,
     minimum_bid=-9999,
+    # obligation = innerhalb von 1 minute reagieren kann
 ) # pay-as-bid/merit-order
 
+# MISO Nodal market
+# https://help.misoenergy.org/knowledgebase/article/KA-01024/en-us
+market_start = today - timedelta(days=14) + timedelta(hours=10, minutes=30)
+
+miso_day_ahead_config = MarketConfig(
+    today,
+    additional_fields=['node_id'],
+    available_market_products=[
+        MarketProduct('hourly', 24),
+    ],
+    continuous=False,
+    opening_hours=rrule.rrule(rrule.DAILY, market_start),
+    opening_duration=timedelta(days=1),
+    amount_unit='MW',
+    price_unit='$/MW',
+    price_tick=0.01,
+    maximum_bid=9999,
+    minimum_bid=-9999,
+    eligable_lambda=lambda agent: agent.location
+) # pay-as-bid/merit-order
+
+# ISO gibt spezifisches Marktergebnis welches nicht teil des Angebots war
+
+# Contour Map
+# https://www.misoenergy.org/markets-and-operations/real-time--market-data/markets-displays/
+# Realtime Data API
+# https://www.misoenergy.org/markets-and-operations/RTDataAPIs/
+# SCED
+# https://help.misoenergy.org/knowledgebase/article/KA-01112/en-us
+# Market Closure Table (unclear)
+# https://help.misoenergy.org/knowledgebase/article/KA-01163/en-us
+# Metrics:
+# https://cdn.misoenergy.org/202211%20Markets%20and%20Operations%20Report627372.pdf (p. 60-63)
+miso_real_time_config = MarketConfig(
+    today,
+    additional_fields=['node_id'],
+    available_market_products=[
+        MarketProduct('5minutes', 12),
+        # unclear how many slots can be traded?
+        # at least the current hour
+    ],
+    continuous=False,
+    opening_hours=rrule.rrule(rrule.MINUTELY, interval=5, dtstart=today-timedelta(hours=1)),
+    opening_duration=timedelta(hours=1),
+    amount_unit='MW',
+    price_unit='$/MW',
+    price_tick=0.01,
+    maximum_bid=9999,
+    minimum_bid=-9999,
+    eligable_lambda=lambda agent: agent.location in BW,
+    clearing = "twoside_clearing"
+) # pay-as-bid/merit-order
+
+
+result_bids = clearing(self, input_bids)
+
+# double auction clearing
+# symmetrical auction
+def twoside_clearing(market_agent):
+    #if not df.empty:
+    # simple merit order calculation
+    # generation
+    market_agent.config.opening_hours:
+
+    additional_fields=['node_id'],
+    available_market_products=[
+        MarketProduct('hourly', 24),
+    ],
+    continuous=False,
+    opening_hours=rrule.rrule(rrule.DAILY, market_start),
+    opening_duration=timedelta(days=1),
+    amount_unit='MW',
+    price_unit='$/MW',
+    price_tick=0.01,
+    maximum_bid=9999,
+    minimum_bid=-9999,
+    eligable_lambda=lambda agent: agent.location
+) # pay-as-bid/merit-order
+
+    asks = df[df['volume']>0].sort_values('price')
+    # demand
+    bids = df[df['volume']<0].sort_values('price', ascending=False)
+    asks['cumsum'] = asks['volume'].cumsum()
+    bids['cumsum'] = bids['volume'].cumsum()
+    for i in range(len(bids['cumsum'])):
+        vol = bids.iloc[i]['cumsum']
+        # get first price to match demand (vol)
+        generation = asks[asks['cumsum'] >= -vol]['price']
+        if not generation.empty:
+            gen_price = generation.values[0]
+            # check if generation price is below highest price demand is willing to pay
+            # for production of vol
+            if gen_price <= bids.iloc[i]['price']:
+                price = gen_price
+                demand = vol
+            else:
+                break
+
+    return [(agent, 50, volume), (agent, 20, volume)]
+
+
+# asymmetrical auction
+# one sided acution
+
+lmp_market
+nodes
+
+
+# GME market - italian
+# which market products exist?
+#
+
+
+# PJM: https://pjm.com/markets-and-operations/energy/real-time/historical-bid-data/unit-bid.aspx
+# DataMiner: https://dataminer2.pjm.com/feed/da_hrl_lmps/definition
+# ContourMap: https://pjm.com/markets-and-operations/interregional-map.aspx
+
+# TODO: ISO NE, ERCOT, CAISO
 
 
 ## Agenten müssen ihren Verpflichtungen nachkommen
 ## TODO: geographische Voraussetzungen - wer darf was - Marktbeitrittsbedingungen
+
+
+
+
+
+# LMP Markt:
+# https://www.e-education.psu.edu/eme801/node/498
+# Alle Contraints und marginal Costs werden gesammelt
+# Markt dispatched kosten an Demand nach Stability constrained Merit-Order
+# Teilnehmer werden nur mit Marginal Costs bezahlt
+# differenz ist congestion revenue -> behält TSO ein?
+
+# All operating facilities in the U.S. devote the first portion of their revenues to the maintenance and operations of the priced lanes. 
+# The traffic monitoring, tolling, enforcement, incident management, administration, and routine maintenance costs can be significant,
+# https://www.cmap.illinois.gov/updates/all/-/asset_publisher/UIMfSLnFfMB6/content/examples-of-how-congestion-pricing-revenues-are-used-elsewhere-in-the-u-s-
+
+
+# Virtual profitability Index:
+# sum of all profits (transactions settled above price) / Total traded MWh
+
+
+# Which roles do you need for the market
+
