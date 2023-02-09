@@ -1,0 +1,63 @@
+title TwoStepMarket
+
+participant ExternalClock
+participant All Agents
+participant Market
+participant IntermediaryMarket1
+participant IM1_Bidders
+participant IntermediaryMarket2
+participant IM2_Bidders
+
+parallel
+IntermediaryMarket1(1)<-Market: clear_market(), send "price was 0"
+IntermediaryMarket2(1)<-Market: clear_market(), send "price was 0"
+parallel off
+
+# section intermediary
+parallel
+ExternalClock->All Agents:10:14 (nextEvent)
+IntermediaryMarket1->(1)IM1_Bidders: clear_market(), send "price was 0"
+IntermediaryMarket2->(1)IM2_Bidders: clear_market(), send "price was 0"
+parallel off
+
+parallel
+IntermediaryMarket1(1)<-IM1_Bidders: send_bids() to market (volume, price)
+IntermediaryMarket2(1)<-IM2_Bidders: send_bids() to market (volume, price)
+parallel off
+
+# upper market
+parallel
+ExternalClock->All Agents:10:15 (nextEvent)
+IntermediaryMarket1(1)<-Market: clear_market(), send "price was 0"
+IntermediaryMarket2(1)<-Market: clear_market(), send "price was 0"
+parallel off
+
+parallel
+Market(5)<-IntermediaryMarket1: send_bids() to market (volume, price)
+Market(4)<-IntermediaryMarket2: send_bids() to market (volume, price)
+parallel off
+
+
+# section intermediary
+parallel
+ExternalClock->All Agents:10:29 (nextEvent)
+IntermediaryMarket1->(1)IM1_Bidders: clear_market(), send "price was 0"
+IntermediaryMarket2->(1)IM2_Bidders: clear_market(), send "price was 0"
+parallel off
+
+parallel
+IntermediaryMarket1(1)<-IM1_Bidders: send_bids() to market (volume, price)
+IntermediaryMarket2(1)<-IM2_Bidders: send_bids() to market (volume, price)
+parallel off
+
+# upper market
+parallel
+ExternalClock->All Agents:10:30 (nextEvent)
+IntermediaryMarket1(1)<-Market: clear_market(), send "price was 0"
+IntermediaryMarket2(1)<-Market: clear_market(), send "price was 0"
+parallel off
+
+parallel
+Market(5)<-IntermediaryMarket1: send_bids() to market (volume, price)
+Market(4)<-IntermediaryMarket2: send_bids() to market (volume, price)
+parallel off

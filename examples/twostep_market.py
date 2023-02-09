@@ -8,8 +8,10 @@ import pandas as pd
 import numpy as np
 import logging
 import time
+from tqdm import tqdm
 from dateutil.parser import parse
 from dataclasses import dataclass
+import matplotlib.pyplot as plt
 
 logger = logging.getLogger(__name__)
 
@@ -30,15 +32,15 @@ class SimpleBid:
 
 
 class TwoSidedMarketRole(Role):
-    def __init__(self, start: datetime):
+    def __init__(self, start: datetime, receiver_ids: list):
         super().__init__()
         self.bids = []
         self.start = start
+        self.receiver_ids = receiver_ids
 
     def setup(self):
         self.context.results = []
         self.context.demands = []
-        self.context.receiver_ids = []
 
         def list_condition(content, meta):
             return isinstance(content, list) and all([type(e)==SimpleBid for e in content])
@@ -84,9 +86,9 @@ class TwoSidedMarketRole(Role):
             dem = bids['cumsum'].values[-1]
             gen = asks['cumsum'].values[-1]
             self.context.volume = dem + gen
+            self.context.results.append(price)
+            self.context.demands.append(-demand)
         self.context.price = price
-        self.context.results.append(price)
-        self.context.demands.append(demand)
         acl_metadata = {
             'performative': Performatives.inform,
             'sender_id': self.context.aid,
@@ -94,7 +96,7 @@ class TwoSidedMarketRole(Role):
             'conversation_id': 'conversation01'
         }
         resp = []
-        for receiver_addr, receiver_id in self.context.receiver_ids:
+        for receiver_addr, receiver_id in self.receiver_ids:
             r = self.context.send_acl_message(receiver_addr=receiver_addr,
                                               receiver_id=receiver_id,
                                               acl_metadata=acl_metadata,
@@ -116,6 +118,18 @@ class TwoSidedMarketRole(Role):
     def handle_list_message(self, content: list[SimpleBid], meta):
         for bid in content:
             self.handle_message(bid, meta)
+
+    async def on_stop(self):
+        logger.info(self.context.results)
+        fig, ax1 = plt.subplots()
+        plt.title(f'Result {self.context.aid}')
+        ax1.plot(self.context.results, label='price')
+        ax2 = ax1.twinx()
+        ax2.plot(self.context.demands, label='demand', c='r')
+        ax1.legend(loc='lower left', bbox_to_anchor= (0.8, 0.06), frameon=False)
+        ax2.legend(loc='lower left', bbox_to_anchor= (0.8, 0.01), frameon=False)
+        #plt.savefig('result.png')
+        plt.show()
 
 
 class BiddingRole(Role):
@@ -143,7 +157,7 @@ class BiddingRole(Role):
         acl_metadata = {
             'performative': Performatives.inform,
             'sender_id': self.context.aid,
-            'sender_addr': ('localhost', 5555),
+            'sender_addr': self.context.addr,
             'conversation_id': 'conversation01'
         }
         await self.context.send_acl_message(receiver_addr=self.receiver_addr,
@@ -157,19 +171,6 @@ class BiddingAgent(RoleAgent):
     def __init__(self, container, receiver_addr, receiver_id, volume=100, price=0.05, suggested_aid=None):
         super().__init__(container, suggested_aid=suggested_aid)
         self.add_role(BiddingRole(receiver_addr, receiver_id, volume, price))
-
-
-class MarketAgent(RoleAgent):
-    def __init__(self, container, start: datetime, suggested_aid=None):
-        super().__init__(container, suggested_aid=suggested_aid)
-        self.add_role(TwoSidedMarketRole(start))
-
-
-class IntermediaryMarketAgent(RoleAgent):
-    def __init__(self, container, start: datetime, receiver_addr, receiver_id, suggested_aid=None):
-        super().__init__(container, suggested_aid=suggested_aid)
-        self.add_role(TwoSidedMarketRole(start))
-        self.add_role(BiddingRole(receiver_addr, receiver_id, 0, 0))
 
 
 async def main(start: datetime):
@@ -186,22 +187,20 @@ async def main(start: datetime):
     for ad in addr:
         c = await create_container(addr=ad, clock=clock)
         containers.append(c)
-    market = MarketAgent(c, start)
+    market = RoleAgent(c, suggested_aid='upper_market')
 
     intermediary_markets = []
     agents = []
     market_receiver_ids = []
     for j in range(5):
-        inter_market = IntermediaryMarketAgent(c, start-timedelta(seconds=60),
-                                               ad, market.aid, suggested_aid=f'inter{j}')
-        intermediary_markets.append(inter_market)
+        inter_market = RoleAgent(c, suggested_aid=f'inter{j}')
 
         if j%2==0:
-            generation_count=5
-            demand_count=7
+            generation_count = 5
+            demand_count = 7
         else:
-            generation_count=7
-            demand_count=5
+            generation_count = 7
+            demand_count = 5
 
         # asks (generation)
         receiver_ids = []
@@ -219,34 +218,21 @@ async def main(start: datetime):
             agent = BiddingAgent(c, ad, inter_market.aid, volume=-80, price=0.03+0.05*(i%9))
             agents.append(agent)
             receiver_ids.append((ad, agent.aid))
-        inter_market._role_context.receiver_ids = receiver_ids
+
+        inter_market.add_role(BiddingRole(market.context.addr, market.aid, 0, 0))
+        inter_market.add_role(TwoSidedMarketRole(start-timedelta(seconds=60), receiver_ids))
+        intermediary_markets.append(inter_market)
 
         market_receiver_ids.append((ad, inter_market.aid))
     # and inter_markets to upper_market
-    market._role_context.receiver_ids = market_receiver_ids
+    market.add_role(TwoSidedMarketRole(start, market_receiver_ids))
 
     if isinstance(clock, ExternalClock):
-        for i in range(100):
+        for i in tqdm(range(100)):
             await asyncio.sleep(0.0001)
             clock.set_time(clock.get_next_activity() or clock.time+1)
-    await c.shutdown()
-    print(market._role_context.results)
-    import matplotlib.pyplot as plt
-    fig, ax1 = plt.subplots()
-    plt.title(f'Simulation Results {market.aid}')
-    plt.plot(market._role_context.results, label='price')
-    ax2 = ax1.twinx()
-    plt.plot(market._role_context.demands, label='demand', c='r')
-    plt.legend()
-    plt.show()
-    for i in intermediary_markets:
-        fig, ax1 = plt.subplots()
-        plt.title(f'Simulation Results {i.aid}')
-        plt.plot(i._role_context.results, label='price')
-        ax2 = ax1.twinx()
-        plt.plot(i._role_context.demands, label='demand', c='r')
-        plt.legend()
-        plt.show()
+    for c in containers:
+        await c.shutdown()
 
 
 

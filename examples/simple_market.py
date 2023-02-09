@@ -10,6 +10,8 @@ import logging
 import time
 from dateutil.parser import parse
 from dataclasses import dataclass
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -20,15 +22,16 @@ class SimpleBid:
 
 
 class OneSidedMarketRole(Role):
-    def __init__(self, demand=1000):
+    def __init__(self, demand=1000, receiver_ids=[]):
         super().__init__()
         self.demand = demand
         self.bids = []
+        self.receiver_ids = receiver_ids
 
     def setup(self):
         self.context.results = []
         self.context.demands = []
-        self.context.receiver_ids = []
+        self.context.receiver_ids = self.receiver_ids
         self.context.demand = self.demand
         start = parse('202301010000')
 
@@ -60,8 +63,8 @@ class OneSidedMarketRole(Role):
         self.context.demands.append(demand)
         acl_metadata = {
             'performative': Performatives.inform,
-            'sender_id': 'agent0',
-            'sender_addr': ('localhost', 5555),
+            'sender_id': self.context.aid,
+            'sender_addr': self.context.addr,
             'conversation_id': 'conversation01'
         }
         resp = []
@@ -84,6 +87,19 @@ class OneSidedMarketRole(Role):
             'sender_id': meta['sender_id']
         }
         self.bids.append(data)
+
+    async def on_stop(self):
+        logger.info(self.context.results)
+        fig, ax1 = plt.subplots()
+        plt.title('Simulation Results')
+        ax1.plot(self.context.results, label='price')
+        ax2 = ax1.twinx()
+        ax2.plot(self.context.demands, label='demand', c='r')
+        ax1.legend(loc='lower left', bbox_to_anchor= (0.8, 0.06), frameon=False)
+        ax2.legend(loc='lower left', bbox_to_anchor= (0.8, 0.01), frameon=False)
+        #plt.savefig('result.png')
+        plt.show()
+
 
 class BiddingRole(Role):
     def __init__(self, receiver_addr, receiver_id, volume=100, price=0.05):
@@ -111,7 +127,7 @@ class BiddingRole(Role):
         acl_metadata = {
             'performative': Performatives.inform,
             'sender_id': self.context.aid,
-            'sender_addr': ('localhost', 5555),
+            'sender_addr': self.context.addr,
             'conversation_id': 'conversation01'
         }
         await self.context.send_acl_message(receiver_addr=self.receiver_addr,
@@ -121,57 +137,34 @@ class BiddingRole(Role):
                                             )
 
 
-class BiddingAgent(RoleAgent):
-    def __init__(self, container, receiver_addr, receiver_id, volume=100, price=0.05, suggested_aid=None):
-        super().__init__(container, suggested_aid=suggested_aid)
-        self.add_role(BiddingRole(receiver_addr, receiver_id, volume, price))
-
-
-class MarketAgent(RoleAgent):
-    def __init__(self, container, demand=1000, suggested_aid=None):
-        super().__init__(container, suggested_aid=suggested_aid)
-        self.add_role(OneSidedMarketRole(demand))
-
-
 async def main(start):
     clock = ExternalClock(start_time=start.timestamp())
 
     # works
     addr = [('127.0.0.1', 5555)]
 
-    # asyncio.exceptions.CancelledError
-    # sys:1: RuntimeWarning: coroutine 'TimestampScheduledTask.run' was never awaited
-    # sys:1: RuntimeWarning: coroutine 'BiddingAgent.set_bids' was never awaited
-    # addr = [('127.0.0.1', 5555), ('127.0.0.1', 5556), ('127.0.0.1', 5557)]
     containers = []
     for ad in addr:
         c = await create_container(addr=ad, clock=clock)
         containers.append(c)
-    market = MarketAgent(c, demand=1000)
+    market = RoleAgent(c)
     agents = []
     receiver_ids = []
     for i in range(17):
         ad = addr[i%len(addr)]
         c = containers[i%len(addr)]
-        agent = BiddingAgent(c, ad, market.aid, price=0.05*(i%9))
+        agent = RoleAgent(c)
+        agent.add_role(BiddingRole(market.context.addr, market.aid, price=0.05*(i%9)))
         agents.append(agent)
         receiver_ids.append((ad, agent.aid))
-    market._role_context.receiver_ids = receiver_ids
+    market.add_role(OneSidedMarketRole(demand=1000, receiver_ids=receiver_ids))
 
     if isinstance(clock, ExternalClock):
-        for i in range(1000):
+        for i in tqdm(range(1000)):
             await asyncio.sleep(0.0001)
             clock.set_time(clock.time + 300)
-    await c.shutdown()
-    print(market._role_context.results)
-    import matplotlib.pyplot as plt
-    fig, ax1 = plt.subplots()
-    plt.title('Simulation Results')
-    plt.plot(market._role_context.results, label='price')
-    ax2 = ax1.twinx()
-    plt.plot(market._role_context.demands, label='demand', c='r')
-    plt.legend()
-    plt.show()
+    for c in containers:
+        await c.shutdown()
 
 if __name__ == '__main__':
     start = parse('202301010000')

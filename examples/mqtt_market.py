@@ -6,27 +6,14 @@ from datetime import datetime
 from dateutil import rrule
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 import logging
 import time
 from dateutil.parser import parse
 from dataclasses import dataclass
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
-
-'''
-This snippet describes a TwoSidedMarketRole which makes a Merit-Order for Demand and Generation
-and the BiddingRole which sends a bid for one quarter hour to this market.
-
-The market is cleared according to the recurrency:
-rrule.rrule(rrule.MINUTELY, interval=15, dtstart=start)
-
-The market handles bids of type SimpleBid at any time.
-The market sends out a message to all known agents to send in their bids.
-Here, a broadcast would be cool, but as this is async communication, the loop is fine too.
-'''
-
 
 @dataclass
 class SimpleBid:
@@ -34,15 +21,17 @@ class SimpleBid:
     volume: float
 
 
-class TwoSidedMarketRole(Role):
-    def __init__(self, receiver_ids):
+class OneSidedMarketRole(Role):
+    def __init__(self, demand=1000):
         super().__init__()
+        self.demand = demand
         self.bids = []
-        self.receiver_ids = receiver_ids
 
     def setup(self):
         self.context.results = []
         self.context.demands = []
+        self.context.receiver_ids = []
+        self.context.demand = self.demand
         start = parse('202301010000')
 
         self.context.subscribe_message(
@@ -58,31 +47,19 @@ class TwoSidedMarketRole(Role):
         df = pd.DataFrame.from_dict(self.bids)
         self.bids = []
         price = 0
-        demand = 0
+        demand = self.context.demand + 0.6 * self.context.demand*np.sin(i*np.pi/12)
         if not df.empty:
             # simple merit order calculation
-            # generation
-            asks = df[df['volume']>0].sort_values('price')
-            # demand
-            bids = df[df['volume']<0].sort_values('price', ascending=False)
-            asks['cumsum'] = asks['volume'].cumsum()
-            bids['cumsum'] = bids['volume'].cumsum()
-            for i in range(len(bids['cumsum'])):
-                vol = bids.iloc[i]['cumsum']
-                # get first price to match demand (vol)
-                generation = asks[asks['cumsum'] >= -vol]['price']
-                if not generation.empty:
-                    gen_price = generation.values[0]
-                    # check if generation price is below highest price demand is willing to pay
-                    # for production of vol
-                    if gen_price <= bids.iloc[i]['price']:
-                        price = gen_price
-                        demand = vol
-                    else:
-                        break
-            self.context.results.append(price)
-            self.context.demands.append(-demand)
-
+            df = df.sort_values('price')
+            df['cumsum'] = df['volume'].cumsum()
+            filtered = df[df['cumsum'] >= demand]
+            if filtered.empty:
+                # demand could not be matched
+                price = 100
+            else:
+                price = filtered['price'].values[0]
+        self.context.results.append(price)
+        self.context.demands.append(demand)
         acl_metadata = {
             'performative': Performatives.inform,
             'sender_id': self.context.aid,
@@ -90,51 +67,52 @@ class TwoSidedMarketRole(Role):
             'conversation_id': 'conversation01'
         }
         resp = []
-        for receiver_addr, receiver_id in self.receiver_ids:
+        for receiver_addr, receiver_id in self.context.receiver_ids:
             r = self.context.send_acl_message(receiver_addr=receiver_addr,
                                               receiver_id=receiver_id,
                                               acl_metadata=acl_metadata,
                                               content={'message': f'Current time is {time}',
-                                                       #'data': df,
+                                                       'data': df,
                                                        'price': price})
             resp.append(r)
         for r in resp:
             await r
 
-    def handle_message(self, content: SimpleBid, meta):
-        if content.volume != 0:
-            self.bids.append({
-                'price': content.price,
-                'volume': content.volume,
-                'sender_id': meta['sender_id']
-            })
+    def handle_message(self, content, meta):
+        # content is SimpleBid
+        data = {
+            'price': content.price,
+            'volume': content.volume,
+            'sender_id': meta['sender_id']
+        }
+        self.bids.append(data)
 
     async def on_stop(self):
         logger.info(self.context.results)
         fig, ax1 = plt.subplots()
         plt.title('Simulation Results')
-        ax1.plot(self.context.results, label='price')
+        plt.plot(self.context.results, label='price')
         ax2 = ax1.twinx()
-        ax2.plot(self.context.demands, label='demand', c='r')
-        ax1.legend(loc='lower left', bbox_to_anchor= (0.8, 0.06), frameon=False)
-        ax2.legend(loc='lower left', bbox_to_anchor= (0.8, 0.01), frameon=False)
-        #plt.savefig('result.png')
+        plt.plot(self.context.demands, label='demand', c='r')
+        plt.legend(['price','demand'])
+        plt.savefig('result.png')
         plt.show()
+
 
 class BiddingRole(Role):
     def __init__(self, receiver_addr, receiver_id, volume=100, price=0.05):
         super().__init__()
         self.receiver_addr = receiver_addr
         self.receiver_id = receiver_id
+        self.start = parse('202301010000')
         self.volume = volume
         self.price = price
-        #self.data = np.eye(100)+1
 
     def setup(self):
         self.context.volume = self.volume
         self.context.price = self.price
         self.context.subscribe_message(
-            self, self.handle_message, lambda content, meta: isinstance(content, dict)
+            self, self.handle_message, lambda content, meta: True
         )
 
     def handle_message(self, content, meta):
@@ -157,45 +135,62 @@ class BiddingRole(Role):
                                             )
 
 
+class BiddingAgent(RoleAgent):
+    def __init__(self, container, receiver_addr, receiver_id, volume=100, price=0.05, suggested_aid=None):
+        super().__init__(container, suggested_aid=suggested_aid)
+        self.add_role(BiddingRole(receiver_addr, receiver_id, volume, price))
+
+
+class MarketAgent(RoleAgent):
+    def __init__(self, container, demand=1000, suggested_aid=None):
+        super().__init__(container, suggested_aid=suggested_aid)
+        self.add_role(OneSidedMarketRole(demand))
+
+
 async def main(start):
     clock = ExternalClock(start_time=start.timestamp())
 
-    # works
-    addr = [('127.0.0.1', 5555)]
+    broker = ("localhost", 1883, 60)
+    connections = [
+        ('c1', {
+        "client_id": "container_1",
+        "broker_addr": broker,
+        "transport": "tcp",
+        }),
+        ('c2', {
+        "client_id": "container_2",
+        "broker_addr": broker,
+        "transport": "tcp",
+        }),
+
+    ]
 
     # asyncio.exceptions.CancelledError
     # sys:1: RuntimeWarning: coroutine 'TimestampScheduledTask.run' was never awaited
     # sys:1: RuntimeWarning: coroutine 'BiddingAgent.set_bids' was never awaited
-    addr = [('127.0.0.1', 5555), ('127.0.0.1', 5556), ('127.0.0.1', 5557)]
+    # addr = [('127.0.0.1', 5555), ('127.0.0.1', 5556), ('127.0.0.1', 5557)]
     containers = []
-    for ad in addr:
-        c = await create_container(addr=ad, clock=clock, copy_internal_messages=False)
+    topics = []
+    for ad, mqtt_kwargs in connections:
+        c = await create_container(connection_type='mqtt', addr=ad, clock=clock, mqtt_kwargs=mqtt_kwargs)
         containers.append(c)
-    market = RoleAgent(c)
+        topics.append(ad)
+    market = MarketAgent(c, demand=1000)
     agents = []
     receiver_ids = []
-    for i in range(6):
-        ad = addr[i%len(addr)]
-        c = containers[i%len(addr)]
+    for i in range(60):
+        ad = topics[i%len(topics)]
+        c = containers[i%len(topics)]
         agent = RoleAgent(c)
-        agent.add_role(BiddingRole(market.context.addr, market.aid, price=0.05*(i%9)))
+        agent.add_role(BiddingRole(topics[-1], market.aid, price=0.05*(i%9)))
         agents.append(agent)
         receiver_ids.append((ad, agent.aid))
-
-    for i in range(15):
-        ad = addr[i%len(addr)]
-        c = containers[i%len(addr)]
-        agent = RoleAgent(c)
-        agent.add_role(BiddingRole(market.context.addr, market.aid, volume=-80, price=0.03+0.05*(i%9)))
-        agents.append(agent)
-        receiver_ids.append((ad, agent.aid))
-    market.add_role(TwoSidedMarketRole(receiver_ids=receiver_ids))
+    market._role_context.receiver_ids = receiver_ids
 
     if isinstance(clock, ExternalClock):
-        for i in tqdm(range(876)):
-            await asyncio.sleep(0.00001)
-            #clock.set_time(clock.time + 300)
-            clock.set_time(clock.get_next_activity() or clock.time+1)
+        for i in tqdm(range(200)):
+            await asyncio.sleep(0.1)
+            clock.set_time(clock.time + 300)
     for c in containers:
         await c.shutdown()
 

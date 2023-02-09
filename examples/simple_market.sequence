@@ -1,0 +1,16 @@
+title SimpleMarket
+
+ExternalClock->All Agents:10:00
+
+Market->Bidders: clear_market(), send "price was 0"
+Market<-Bidders: send_bids() to market (volume, price)
+ExternalClock->All Agents:10:05
+ExternalClock->All Agents:10:10
+ExternalClock->All Agents:10:15
+Market->Bidders: clear_market(), send "price was 50"
+Market<-Bidders: send_bids() to market (volume, price)
+ExternalClock->All Agents:10:20
+ExternalClock->All Agents:10:25
+ExternalClock->All Agents:10:30
+Market->Bidders: clear_market(), send "price was 40"
+Market<-Bidders: send_bids() to market (volume, price)
