@@ -1,5 +1,5 @@
 import asyncio
-from mango import RoleAgent, Agent, create_container, Role
+from mango import RoleAgent, create_container, Role
 from mango.util.clock import ExternalClock
 from mango.messages.message import Performatives
 from datetime import datetime
@@ -7,16 +7,15 @@ from dateutil import rrule
 import pandas as pd
 import numpy as np
 import logging
-import time
 from dateutil.parser import parse
-from dataclasses import dataclass
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from typing import TypedDict
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class SimpleBid:
+
+class SimpleBid(TypedDict):
     price: float
     volume: float
 
@@ -36,11 +35,11 @@ class OneSidedMarketRole(Role):
         start = parse('202301010000')
 
         self.context.subscribe_message(
-            self, self.handle_message, lambda content, meta: isinstance(content, SimpleBid)
+            self, self.handle_message, lambda content, meta: isinstance(content, dict)
         )
         # market acts every 15 minutes
         recurrency = rrule.rrule(rrule.MINUTELY, interval=15, dtstart=start)
-        self.context.schedule_recurrent_task(coroutine_func=self.clear_market, recurrency=recurrency)
+        self.context.schedule_periodic_task(coroutine_func=self.clear_market, delay=900)
 
     async def clear_market(self):
         time = datetime.fromtimestamp(self.context.current_timestamp)
@@ -67,26 +66,18 @@ class OneSidedMarketRole(Role):
             'sender_addr': self.context.addr,
             'conversation_id': 'conversation01'
         }
-        resp = []
         for receiver_addr, receiver_id in self.context.receiver_ids:
-            r = self.context.send_acl_message(receiver_addr=receiver_addr,
-                                              receiver_id=receiver_id,
-                                              acl_metadata=acl_metadata,
-                                              content={'message': f'Current time is {time}',
-                                                       #'data': df,
-                                                       'price': price})
-            resp.append(r)
-        for r in resp:
-            await r
+            await self.context.send_acl_message(receiver_addr=receiver_addr,
+                                                receiver_id=receiver_id,
+                                                acl_metadata=acl_metadata,
+                                                content={'message': f'Current time is {time}',
+                                                         'data': df,
+                                                         'price': price})
 
     def handle_message(self, content, meta):
         # content is SimpleBid
-        data = {
-            'price': content.price,
-            'volume': content.volume,
-            'sender_id': meta['sender_id']
-        }
-        self.bids.append(data)
+        content['sender_id']= meta['sender_id']
+        self.bids.append(content)
 
     async def on_stop(self):
         logger.info(self.context.results)
@@ -133,19 +124,20 @@ class BiddingRole(Role):
         await self.context.send_acl_message(receiver_addr=self.receiver_addr,
                                             receiver_id=self.receiver_id,
                                             acl_metadata=acl_metadata,
-                                            content=SimpleBid(price, self.context.volume)
+                                            content={'price': price, 'volume': self.context.volume}
                                             )
 
 
 async def main(start):
     clock = ExternalClock(start_time=start.timestamp())
+    from mango.messages.codecs import JSON, PROTOBUF
 
     # works
-    addr = [('127.0.0.1', 5555)]
-
+    addr = [('127.0.0.1', 5555), ('127.0.0.1', 5556)]
+    
     containers = []
     for ad in addr:
-        c = await create_container(addr=ad, clock=clock)
+        c = await create_container(addr=ad, clock=clock, codec=PROTOBUF(generic_serializer=True))
         containers.append(c)
     market = RoleAgent(c)
     agents = []
@@ -161,7 +153,7 @@ async def main(start):
 
     if isinstance(clock, ExternalClock):
         for i in tqdm(range(1000)):
-            await asyncio.sleep(0.0001)
+            await asyncio.sleep(0.01)
             clock.set_time(clock.time + 300)
     for c in containers:
         await c.shutdown()
