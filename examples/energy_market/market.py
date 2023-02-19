@@ -188,28 +188,18 @@ async def main(start):
 
     for marketconfig in marketdesign:
         market.add_role(MarketRole(marketconfig))
-        marketconfig.addr = market.context.addr
-        marketconfig.aid = market.aid
 
-    agents = []
-    receiver_ids = []
     for i in range(4):
-        ad = addr[i % len(addr)]
         agent = RoleAgent(c)
         agent.add_role(
             BiddingRole(marketdesign, price=0.05 * (i % 9))
         )
-        agents.append(agent)
-        receiver_ids.append((ad, agent.aid))
 
     for i in range(4):
-        ad = addr[i % len(addr)]
         agent = RoleAgent(c)
         agent.add_role(
             BiddingRole(marketdesign, price=5 * (i % 9), volume=-80)
         )
-        agents.append(agent)
-        receiver_ids.append((ad, agent.aid))
 
     if isinstance(clock, ExternalClock):
         next_activity = clock.get_next_activity()
@@ -218,7 +208,7 @@ async def main(start):
             # clock.set_time(clock.time + 300)
             next_activity = clock.get_next_activity()
             if not next_activity:
-                logger.info('finished')
+                logger.info('simulation finished - no schedules left')
                 break
             clock.set_time(next_activity)
 

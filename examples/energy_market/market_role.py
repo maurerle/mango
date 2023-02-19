@@ -173,6 +173,8 @@ class MarketRole(Role):
         self.market_result: Orderbook = []
 
     def setup(self):
+        self.marketconfig.addr = self.context.addr
+        self.marketconfig.aid = self.context.aid
         def accept_orderbook(content: dict, meta):
             if not isinstance(content, dict):
                 return False
