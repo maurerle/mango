@@ -30,8 +30,25 @@ def aggregate_step_amount(orderbook: Orderbook):
     """
     deltas = []
     for bid in orderbook:
-        deltas.append(bid["start_time"], bid["volume"])
-        deltas.append(bid["end_time"], -bid["volume"])
+        if bid["only_hours"] is None:
+            deltas.append(bid["start_time"], bid["volume"])
+            deltas.append(bid["end_time"], -bid["volume"])
+        else:
+            # only_hours allows to have peak or off-peak bids
+            start_hour, end_hour = bid["only_hours"]
+            duration_hours = end_hour - start_hour
+            if duration_hours <= 0:
+                duration_hours += 24
+
+            starts = rr.rrule(
+                rr.DAILY,
+                dtstart=bid["start_time"],
+                byhour=start_hour,
+                until=bid["end_time"],
+            )
+            for date in starts:
+                deltas.append(date, bid["volume"])
+                deltas.append(date + timedelta(hours=duration_hours), -bid["volume"])
 
     times = []
     aggregation = []
