@@ -24,8 +24,6 @@ MarketOrderbook = dict[str, Orderbook]
 contracttype = Callable[[Agent, Agent], None]
 marketcontracttype = Callable[[Agent, Agent, ArrayLike], None]
 eligable_lambda = Callable[Agent, bool]
-market_mechanism = Callable[Role, tuple[Orderbook, dict]]
-
 
 # describes the configuration of an actual product traded at the market
 @dataclass
@@ -43,10 +41,13 @@ class MarketProduct():
     duration: rd # quarter-hourly, half-hourly, hourly, 4hourly, daily, weekly, monthly, quarter-yearly, yearly
     count: int # how many future durations can be traded, must be >= 1
     # count can also be given as a rrule with until
-    first_delivery_after_start: rd = rd() # when does the first delivery begin, in relation to market start
+    first_delivery_after_start: rd = rd()  # when does the first delivery begin, in relation to market start
     # this should be a multiple of duration
-    only_hours: tuple[int, int] | None = None # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
+    only_hours: tuple[int, int] | None = None  # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
     eligable_lambda_function: eligable_lambda | None = None
+
+
+market_mechanism = Callable[[Role, list[MarketProduct]], tuple[Orderbook, dict]]
 
 
 @dataclass
@@ -424,30 +425,6 @@ miso_real_time_config = MarketConfig(
 
 
 result_bids = clearing(self, input_bids)
-
-# double auction clearing
-# symmetrical auction
-def twoside_clearing(market_agent):
-    asks = df[df['volume']>0].sort_values('price')
-    # demand
-    bids = df[df['volume']<0].sort_values('price', ascending=False)
-    asks['cumsum'] = asks['volume'].cumsum()
-    bids['cumsum'] = bids['volume'].cumsum()
-    for i in range(len(bids['cumsum'])):
-        vol = bids.iloc[i]['cumsum']
-        # get first price to match demand (vol)
-        generation = asks[asks['cumsum'] >= -vol]['price']
-        if not generation.empty:
-            gen_price = generation.values[0]
-            # check if generation price is below highest price demand is willing to pay
-            # for production of vol
-            if gen_price <= bids.iloc[i]['price']:
-                price = gen_price
-                demand = vol
-            else:
-                break
-
-    return [(agent, 50, volume), (agent, 20, volume)]
 '''
 
 # asymmetrical auction

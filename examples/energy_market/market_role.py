@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 from itertools import groupby
+from operator import itemgetter
 from math import isclose
 from typing import TypedDict
 
@@ -81,46 +82,61 @@ def cumsum(orderbook: Orderbook):
     return orderbook
 
 
-def twoside_clearing(market_agent: MarketRole):
-    bids = filter(lambda x: x['volume'] < 0, market_agent.all_orders)
-    asks = filter(lambda x: x['volume'] > 0, market_agent.all_orders)
-    # volume 0 is ignored/invalid
-
-    # generation
-    sorted_asks = sorted(asks, key=lambda i: i['price'])
-
-    # demand
-    sorted_bids = sorted(bids, key=lambda i: i['price'], reverse=True)
-
-    sorted_asks = cumsum(sorted_asks)
-    sorted_bids = cumsum(sorted_bids)
+def twoside_clearing(market_agent: MarketRole, market_products: list[MarketProduct]):
+    market_getter = itemgetter('start_time', 'end_time', 'only_hours')
     accepted_orders = []
-    price = 0
-    demand = 0
-    intersection_found = False
-    for i in range(len(sorted_bids)):
-        total_vol = sorted_bids[i]['cumsum']
-        # get first price to match demand (vol)
+    rejected_orders = []
+    for product, product_orders in groupby(market_agent.all_orders, market_getter):
+        if product not in market_products:
+            rejected_orders.extend(product_orders)
+            #logger.debug(f'found unwanted bids for {product} should be {market_products}')
+            continue
+        product_orders = list(product_orders)
+        bids = filter(lambda x: x['volume'] < 0, product_orders)
+        asks = filter(lambda x: x['volume'] > 0, product_orders)
+        # volume 0 is ignored/invalid
 
-        for ask in sorted_asks:
-            if ask['cumsum'] >= -total_vol:
-                assert price <= ask['price'], 'wrong order'
-                price = ask['price']
-                demand = total_vol
-                accepted_orders.append(ask)
-            else:
-                intersection_found = True
+        # generation
+        sorted_asks = sorted(asks, key=lambda i: i['price'])
+
+        # demand
+        sorted_bids = sorted(bids, key=lambda i: i['price'], reverse=True)
+
+        sorted_asks = cumsum(sorted_asks)
+        sorted_bids = cumsum(sorted_bids)
+
+        price, demand, i, j = 0, 0, 0, 0
+        intersection_found = False
+        for i in range(len(sorted_bids)):
+            total_vol = sorted_bids[i]['cumsum']
+            # get first price to match demand (vol)
+            for j in range(len(sorted_asks)):
+                #gen = total_generation + sorted_asks[j]['volume']
+                if sorted_asks[j]['cumsum'] >= -demand:
+                    assert price <= sorted_asks[j]['price'], 'wrong order'
+                    if sorted_asks[j]['price'] < sorted_bids[i]['price']:
+                        # generation is cheaper than demand
+                        price = sorted_asks[j]['price']
+                        demand = total_vol
+                    else:
+                        intersection_found = True
+                    break
+            if intersection_found:
                 break
-        if intersection_found:
-            break
-
-        accepted_orders.append(sorted_bids[i])
-    if price == 0:
-        price = market_agent.marketconfig.maximum_bid
+            
+        accepted_orders.extend(sorted_bids[:i])
+        accepted_orders.extend(sorted_asks[:j])
+        rejected_orders.extend(sorted_bids[i:])
+        rejected_orders.extend(sorted_asks[j:])
+        if price == 0:
+            price = market_agent.marketconfig.maximum_bid
     meta = {
-        'volume': demand,
+        'volume': -demand,
         'price': price
     }
+    market_agent.all_orders = rejected_orders
+    # accepted orders can not be used in future
+
     return accepted_orders, meta
 
 
@@ -139,7 +155,7 @@ def get_available_products(market_products: list[MarketProduct], startdate: date
     for product in market_products:
         start = startdate + product.first_delivery_after_start
         if isinstance(product.duration, rrule.rrule):
-            starts = list(product.duration.xafter(start, product.count+1))
+            starts = list(product.duration.xafter(start, product.count + 1))
             for i in range(product.count):
                 period_start = starts[i]
                 period_end = starts[i+1]
@@ -208,11 +224,11 @@ class MarketRole(Role):
         opening_message = {
             'context': 'opening',
             'market': self.marketconfig.name,
-            'start': current,
+            'start': next_opening,
             'stop': market_closing,
             'products': products
         }
-        self.context.schedule_timestamp_task(self.clear_market(), market_closing.timestamp())
+        self.context.schedule_timestamp_task(self.clear_market(products), market_closing.timestamp())
         self.context.schedule_timestamp_task(self.next_opening(), next_opening.timestamp())
         logger.info(f"market {self.marketconfig.name} - {next_opening} - {market_closing}")
 
@@ -259,8 +275,8 @@ class MarketRole(Role):
                 acl_metadata={"sender_addr": self.context.addr, "sender_id": self.context.aid, "reply_to": 1}
             )
 
-    async def clear_market(self):
-        self.market_result, market_meta = self.marketconfig.market_mechanism(self)
+    async def clear_market(self, market_products: list[MarketProduct]):
+        self.market_result, market_meta = self.marketconfig.market_mechanism(self, market_products)
 
         for agent, accepted_orderbook in groupby(self.market_result, lambda o: o['agent_id']):
             addr, aid = agent

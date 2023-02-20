@@ -161,7 +161,7 @@ eex_marketconfig = MarketConfig(
 
 simple_dayahead_auction_config = MarketConfig(
     "simple_dayahead_auction",
-    market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1, hour=0))],
+    market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
     opening_hours=rr.rrule(
         rr.HOURLY, dtstart=datetime(2005, 6, 1), until=datetime(2030, 12, 31),
         cache=True,
@@ -203,18 +203,19 @@ async def main(start):
 
     if isinstance(clock, ExternalClock):
         next_activity = clock.get_next_activity()
-        for i in tqdm(range(100)):
-            await asyncio.sleep(0.001)
+        for i in (t := tqdm(range(100))):
+            await asyncio.sleep(0.0001)
             # clock.set_time(clock.time + 300)
             next_activity = clock.get_next_activity()
             if not next_activity:
                 logger.info('simulation finished - no schedules left')
                 break
+            t.set_description(f"{datetime.fromtimestamp(next_activity)}")
             clock.set_time(next_activity)
 
     for c in containers:
         await c.shutdown()
 
 if __name__ == "__main__":
-    logging.basicConfig(level='INFO')
+    logging.basicConfig(level='WARN')
     asyncio.run(main(datetime.now()))
