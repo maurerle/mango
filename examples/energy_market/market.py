@@ -11,20 +11,27 @@ from mango import Role, RoleAgent, create_container
 from mango.messages.message import Performatives
 from mango.container.core import Container
 from mango.util.clock import ExternalClock
-from market_role import MarketRole, MarketOrderbook, Order, Orderbook, OpeningMessage, ClearingMessage
+from market_role import (
+    MarketRole,
+    MarketOrderbook,
+    Order,
+    Orderbook,
+    OpeningMessage,
+    ClearingMessage,
+)
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 def aggregate_step_amount(orderbook: Orderbook):
-    '''
+    """
     step function with bought volume
-    '''
+    """
     deltas = []
     for bid in orderbook:
-        deltas.append(bid['start_time'], bid['volume'])
-        deltas.append(bid['end_time'], -bid['volume'])
+        deltas.append(bid["start_time"], bid["volume"])
+        deltas.append(bid["end_time"], -bid["volume"])
 
     times = []
     aggregation = []
@@ -50,10 +57,14 @@ class BiddingRole(Role):
         self.context.volume = self.volume
         self.context.price = self.price
         self.context.subscribe_message(
-            self, self.handle_opening, lambda content, meta: content.get('context')=='opening'
+            self,
+            self.handle_opening,
+            lambda content, meta: content.get("context") == "opening",
         )
         self.context.subscribe_message(
-            self, self.handle_market_result, lambda content, meta: content.get('context')=='clearing'
+            self,
+            self.handle_market_result,
+            lambda content, meta: content.get("context") == "clearing",
         )
 
         for market in self.available_markets:
@@ -71,8 +82,12 @@ class BiddingRole(Role):
                 {"context": "registration", "market": market.name},
                 market.addr,
                 receiver_id=market.aid,
-                acl_metadata={"sender_addr": self.context.addr, "sender_id": self.context.aid}
-            ), 1  # register after time was updated for the first time
+                acl_metadata={
+                    "sender_addr": self.context.addr,
+                    "sender_id": self.context.aid,
+                },
+            ),
+            1,  # register after time was updated for the first time
         )
 
     def handle_opening(self, opening: OpeningMessage, meta):
@@ -83,25 +98,25 @@ class BiddingRole(Role):
 
     def handle_market_result(self, content, meta):
         logger.debug(f"got market result: {content}")
-        orderbook: Orderbook = content['orderbook']
+        orderbook: Orderbook = content["orderbook"]
         for bid in orderbook:
             self.valid_orders.append(bid)
 
     async def set_bids(self, opening):
-        products = opening['products']
-        market = self.registered_markets[opening['market']]
+        products = opening["products"]
+        market = self.registered_markets[opening["market"]]
         logger.debug(f"setting bids for {market.name}")
         orderbook: Orderbook = []
         for product in products:
             price = self.context.price + 0.03 * self.context.price * np.random.random()
             price = market.price_tick * round(price / market.price_tick)
             order: Order = {}
-            order['start_time'] = product[0]
-            order['end_time'] = product[1]
-            order['only_hours'] = product[2]
-            order['agent_id'] = (self.context.addr, self.context.aid)
-            order['volume'] = self.volume
-            order['price'] = price
+            order["start_time"] = product[0]
+            order["end_time"] = product[1]
+            order["only_hours"] = product[2]
+            order["agent_id"] = (self.context.addr, self.context.aid)
+            order["volume"] = self.volume
+            order["price"] = price
             orderbook.append(order)
 
         acl_metadata = {
@@ -112,8 +127,8 @@ class BiddingRole(Role):
         }
         await self.context.send_acl_message(
             content={
-                'market': market.name,
-                'orderbook': orderbook  # type: Orderbook
+                "market": market.name,
+                "orderbook": orderbook,
             },
             receiver_addr=market.addr,
             receiver_id=market.aid,
@@ -124,20 +139,14 @@ class BiddingRole(Role):
 first_after_start = rd(days=2, hour=0)
 market_products = [
     MarketProduct(rd(days=+1, hour=0), 7, first_after_start),
-    MarketProduct(
-        rd(weeks=+1, weekday=0, hour=0), 4, first_after_start
-    ),
-    MarketProduct(
-        rd(months=+1, day=1, hour=0), 9, first_after_start
-    ),
+    MarketProduct(rd(weeks=+1, weekday=0, hour=0), 4, first_after_start),
+    MarketProduct(rd(months=+1, day=1, hour=0), 9, first_after_start),
     MarketProduct(
         rr.rrule(rr.MONTHLY, bymonth=(1, 4, 7, 10), bymonthday=1, byhour=0),
         11,
         first_after_start,
     ),
-    MarketProduct(
-        rd(years=+1, yearday=1, hour=0), 10, first_after_start
-    ),
+    MarketProduct(rd(years=+1, yearday=1, hour=0), 10, first_after_start),
 ]
 
 eex_marketconfig = MarketConfig(
@@ -156,14 +165,16 @@ eex_marketconfig = MarketConfig(
     minimum_bid=-9999,
     amount_unit="MW",
     price_unit="0.01 €/MWh",
-    market_mechanism='pay_as_bid'
+    market_mechanism="pay_as_bid",
 )
 
 simple_dayahead_auction_config = MarketConfig(
     "simple_dayahead_auction",
     market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
     opening_hours=rr.rrule(
-        rr.HOURLY, dtstart=datetime(2005, 6, 1), until=datetime(2030, 12, 31),
+        rr.HOURLY,
+        dtstart=datetime(2005, 6, 1),
+        until=datetime(2030, 12, 31),
         cache=True,
     ),
     opening_duration=timedelta(hours=1),
@@ -171,7 +182,7 @@ simple_dayahead_auction_config = MarketConfig(
     amount_unit="MWh",
     amount_tick=0.1,
     price_unit="€/MW",
-    market_mechanism='pay_as_clear'
+    market_mechanism="pay_as_clear",
 )
 
 marketdesign = [eex_marketconfig, simple_dayahead_auction_config]
@@ -191,15 +202,11 @@ async def main(start):
 
     for i in range(4):
         agent = RoleAgent(c)
-        agent.add_role(
-            BiddingRole(marketdesign, price=0.05 * (i % 9))
-        )
+        agent.add_role(BiddingRole(marketdesign, price=0.05 * (i % 9)))
 
     for i in range(4):
         agent = RoleAgent(c)
-        agent.add_role(
-            BiddingRole(marketdesign, price=5 * (i % 9), volume=-80)
-        )
+        agent.add_role(BiddingRole(marketdesign, price=5 * (i % 9), volume=-80))
 
     if isinstance(clock, ExternalClock):
         next_activity = clock.get_next_activity()
@@ -208,7 +215,7 @@ async def main(start):
             # clock.set_time(clock.time + 300)
             next_activity = clock.get_next_activity()
             if not next_activity:
-                logger.info('simulation finished - no schedules left')
+                logger.info("simulation finished - no schedules left")
                 break
             t.set_description(f"{datetime.fromtimestamp(next_activity)}")
             clock.set_time(next_activity)
@@ -216,6 +223,7 @@ async def main(start):
     for c in containers:
         await c.shutdown()
 
+
 if __name__ == "__main__":
-    logging.basicConfig(level='WARN')
+    logging.basicConfig(level="WARN")
     asyncio.run(main(datetime.now()))

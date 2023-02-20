@@ -14,12 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 def is_mod_close(a, mod_b):
-    '''
+    """
     due to floating point, a mod b can be very close to 0 or very close to mod_b
-    '''
-    abs_tol=1e-14
+    """
+    abs_tol = 1e-14
     # abs_tol needed for comparison near zero
-    return isclose(a % mod_b, 0, abs_tol=abs_tol ) or isclose(a % mod_b, mod_b, abs_tol=abs_tol)
+    return isclose(a % mod_b, 0, abs_tol=abs_tol) or isclose(
+        a % mod_b, mod_b, abs_tol=abs_tol
+    )
 
 
 class OpeningMessage(TypedDict):
@@ -35,38 +37,39 @@ class ClearingMessage(TypedDict):
     market_id: str
     orderbook: Orderbook
 
+
 # can be extended with custom config fields
 
 
 orderbook: MarketOrderbook = {
-    'agent1': [
+    "agent1": [
         {
-            'start_time': datetime.now(),
-            'end_time': datetime.now(),
-            'volume': 100,
-            'price': 50.4,
+            "start_time": datetime.now(),
+            "end_time": datetime.now(),
+            "volume": 100,
+            "price": 50.4,
         },
         {
-            'start_time': datetime.now(),
-            'end_time': datetime.now(),
-            'volume': 100,
-            'price': 50.4,
-        }
+            "start_time": datetime.now(),
+            "end_time": datetime.now(),
+            "volume": 100,
+            "price": 50.4,
+        },
     ],
-    'agent2': [
+    "agent2": [
         {
-            'start_time': datetime.now(),
-            'end_time': datetime.now(),
-            'volume': 100,
-            'price': 50.4,
+            "start_time": datetime.now(),
+            "end_time": datetime.now(),
+            "volume": 100,
+            "price": 50.4,
         },
         {
-            'start_time': datetime.now(),
-            'end_time': datetime.now(),
-            'volume': 100,
-            'price': 50.4,
-        }
-    ]
+            "start_time": datetime.now(),
+            "end_time": datetime.now(),
+            "volume": 100,
+            "price": 50.4,
+        },
+    ],
 }
 
 
@@ -77,30 +80,30 @@ class MarketRole(Role):
 def cumsum(orderbook: Orderbook):
     sum_ = 0
     for order in orderbook:
-        sum_ += order['volume']
-        order['cumsum'] = sum_
+        sum_ += order["volume"]
+        order["cumsum"] = sum_
     return orderbook
 
 
 def twoside_clearing(market_agent: MarketRole, market_products: list[MarketProduct]):
-    market_getter = itemgetter('start_time', 'end_time', 'only_hours')
+    market_getter = itemgetter("start_time", "end_time", "only_hours")
     accepted_orders = []
     rejected_orders = []
     for product, product_orders in groupby(market_agent.all_orders, market_getter):
         if product not in market_products:
             rejected_orders.extend(product_orders)
-            #logger.debug(f'found unwanted bids for {product} should be {market_products}')
+            # logger.debug(f'found unwanted bids for {product} should be {market_products}')
             continue
         product_orders = list(product_orders)
-        bids = filter(lambda x: x['volume'] < 0, product_orders)
-        asks = filter(lambda x: x['volume'] > 0, product_orders)
+        bids = filter(lambda x: x["volume"] < 0, product_orders)
+        asks = filter(lambda x: x["volume"] > 0, product_orders)
         # volume 0 is ignored/invalid
 
         # generation
-        sorted_asks = sorted(asks, key=lambda i: i['price'])
+        sorted_asks = sorted(asks, key=lambda i: i["price"])
 
         # demand
-        sorted_bids = sorted(bids, key=lambda i: i['price'], reverse=True)
+        sorted_bids = sorted(bids, key=lambda i: i["price"], reverse=True)
 
         sorted_asks = cumsum(sorted_asks)
         sorted_bids = cumsum(sorted_bids)
@@ -108,32 +111,29 @@ def twoside_clearing(market_agent: MarketRole, market_products: list[MarketProdu
         price, demand, i, j = 0, 0, 0, 0
         intersection_found = False
         for i in range(len(sorted_bids)):
-            total_vol = sorted_bids[i]['cumsum']
+            total_vol = sorted_bids[i]["cumsum"]
             # get first price to match demand (vol)
             for j in range(len(sorted_asks)):
-                #gen = total_generation + sorted_asks[j]['volume']
-                if sorted_asks[j]['cumsum'] >= -demand:
-                    assert price <= sorted_asks[j]['price'], 'wrong order'
-                    if sorted_asks[j]['price'] < sorted_bids[i]['price']:
+                # gen = total_generation + sorted_asks[j]['volume']
+                if sorted_asks[j]["cumsum"] >= -demand:
+                    assert price <= sorted_asks[j]["price"], "wrong order"
+                    if sorted_asks[j]["price"] < sorted_bids[i]["price"]:
                         # generation is cheaper than demand
-                        price = sorted_asks[j]['price']
+                        price = sorted_asks[j]["price"]
                         demand = total_vol
                     else:
                         intersection_found = True
                     break
             if intersection_found:
                 break
-            
+
         accepted_orders.extend(sorted_bids[:i])
         accepted_orders.extend(sorted_asks[:j])
         rejected_orders.extend(sorted_bids[i:])
         rejected_orders.extend(sorted_asks[j:])
         if price == 0:
             price = market_agent.marketconfig.maximum_bid
-    meta = {
-        'volume': -demand,
-        'price': price
-    }
+    meta = {"volume": -demand, "price": price}
     market_agent.all_orders = rejected_orders
     # accepted orders can not be used in future
 
@@ -141,12 +141,11 @@ def twoside_clearing(market_agent: MarketRole, market_products: list[MarketProdu
 
 
 available_strategies = {
-    'one_side_market': 'TODO',
-    'two_side_market': twoside_clearing,
-    'pay_as_bid': twoside_clearing,  # TODO
-    'pay_as_clear': twoside_clearing,
-    'nodal_market': 'TODO',
-
+    "one_side_market": "TODO",
+    "two_side_market": twoside_clearing,
+    "pay_as_bid": twoside_clearing,  # TODO
+    "pay_as_clear": twoside_clearing,
+    "nodal_market": "TODO",
 }
 
 
@@ -158,7 +157,7 @@ def get_available_products(market_products: list[MarketProduct], startdate: date
             starts = list(product.duration.xafter(start, product.count + 1))
             for i in range(product.count):
                 period_start = starts[i]
-                period_end = starts[i+1]
+                period_end = starts[i + 1]
                 options.append((period_start, period_end, product.only_hours))
         else:
             for i in range(product.count):
@@ -178,7 +177,7 @@ class MarketRole(Role):
         if isinstance(marketconfig.market_mechanism, str):
             strategy = available_strategies.get(marketconfig.market_mechanism)
             if not strategy:
-                raise Exception(f'invalid strategy {marketconfig.market_mechanism}')
+                raise Exception(f"invalid strategy {marketconfig.market_mechanism}")
             marketconfig.market_mechanism = strategy
 
         self.marketconfig: MarketConfig = marketconfig
@@ -191,26 +190,36 @@ class MarketRole(Role):
     def setup(self):
         self.marketconfig.addr = self.context.addr
         self.marketconfig.aid = self.context.aid
+
         def accept_orderbook(content: dict, meta):
             if not isinstance(content, dict):
                 return False
-            name_match = content.get('market') == self.marketconfig.name
-            orderbook_exists = content.get('orderbook') is not None
+            name_match = content.get("market") == self.marketconfig.name
+            orderbook_exists = content.get("orderbook") is not None
             return name_match and orderbook_exists
 
         def accept_registration(content: dict, meta):
             if not isinstance(content, dict):
                 return False
-            return content.get('context') == 'registration' and content.get('market') == self.marketconfig.name
+            return (
+                content.get("context") == "registration"
+                and content.get("market") == self.marketconfig.name
+            )
 
         self.context.subscribe_message(self, self.handle_orderbook, accept_orderbook)
         self.context.subscribe_message(
-            self, self.handle_registration, accept_registration
+            self,
+            self.handle_registration,
+            accept_registration
             # TODO safer type check? dataclass?
         )
         current = datetime.fromtimestamp(self.context.current_timestamp)
-        next_opening = self.marketconfig.opening_hours.after(current + timedelta(days=1))
-        self.context.schedule_timestamp_task(self.next_opening(), next_opening.timestamp())
+        next_opening = self.marketconfig.opening_hours.after(
+            current + timedelta(days=1)
+        )
+        self.context.schedule_timestamp_task(
+            self.next_opening(), next_opening.timestamp()
+        )
 
     async def next_opening(self):
         current = datetime.fromtimestamp(self.context.current_timestamp)
@@ -220,17 +229,25 @@ class MarketRole(Role):
             return
 
         market_closing = next_opening + self.marketconfig.opening_duration
-        products = get_available_products(self.marketconfig.market_products, next_opening)
+        products = get_available_products(
+            self.marketconfig.market_products, next_opening
+        )
         opening_message = {
-            'context': 'opening',
-            'market': self.marketconfig.name,
-            'start': next_opening,
-            'stop': market_closing,
-            'products': products
+            "context": "opening",
+            "market": self.marketconfig.name,
+            "start": next_opening,
+            "stop": market_closing,
+            "products": products,
         }
-        self.context.schedule_timestamp_task(self.clear_market(products), market_closing.timestamp())
-        self.context.schedule_timestamp_task(self.next_opening(), next_opening.timestamp())
-        logger.info(f"market {self.marketconfig.name} - {next_opening} - {market_closing}")
+        self.context.schedule_timestamp_task(
+            self.clear_market(products), market_closing.timestamp()
+        )
+        self.context.schedule_timestamp_task(
+            self.next_opening(), next_opening.timestamp()
+        )
+        logger.info(
+            f"market {self.marketconfig.name} - {next_opening} - {market_closing}"
+        )
 
         for agent in self.registered_agents:
             agent_addr, agent_id = agent
@@ -238,7 +255,10 @@ class MarketRole(Role):
                 opening_message,
                 agent_addr,
                 receiver_id=agent_id,
-                acl_metadata={"sender_addr": self.context.addr, "sender_id": self.context.aid}
+                acl_metadata={
+                    "sender_addr": self.context.addr,
+                    "sender_id": self.context.aid,
+                },
             )
 
     def handle_registration(self, content: str, meta):
@@ -249,44 +269,58 @@ class MarketRole(Role):
             self.registered_agents.append((agent_addr, agent))
 
     def handle_orderbook(self, content, meta):
-        orderbook: Orderbook = content['orderbook']
+        orderbook: Orderbook = content["orderbook"]
         # TODO check if agent is allowed to bid
         agent_addr = meta["sender_addr"]
         agent_id = meta["sender_id"]
         try:
             for order in orderbook:
-                order['agent_id'] = (agent_addr, agent_id)
+                order["agent_id"] = (agent_addr, agent_id)
 
-                assert is_mod_close(order['volume'], self.marketconfig.amount_tick), 'amount_tick'
-                assert is_mod_close(order['price'], self.marketconfig.price_tick), 'price_tick'
-                assert order['price'] <= self.marketconfig.maximum_bid, 'max_bid'
-                assert order['price'] >= self.marketconfig.minimum_bid, 'min_bid'
-                assert abs(order['volume']) <= self.marketconfig.maximum_volume, 'max_volume'
+                assert is_mod_close(
+                    order["volume"], self.marketconfig.amount_tick
+                ), "amount_tick"
+                assert is_mod_close(
+                    order["price"], self.marketconfig.price_tick
+                ), "price_tick"
+                assert order["price"] <= self.marketconfig.maximum_bid, "max_bid"
+                assert order["price"] >= self.marketconfig.minimum_bid, "min_bid"
+                assert (
+                    abs(order["volume"]) <= self.marketconfig.maximum_volume
+                ), "max_volume"
                 for field in self.marketconfig.additional_fields:
-                    assert order[field], f'missing field: {field}'
+                    assert order[field], f"missing field: {field}"
                 self.all_orders.append(order)
             self.order_book[agent_id] = orderbook
         except Exception as e:
             logger.error(f"error handling message from {agent_id} - {e}")
             self.context.schedule_instant_acl_message(
-                content={'context': 'Rejected'},
+                content={"context": "Rejected"},
                 receiver_addr=agent_addr,
                 receiver_id=agent_id,
-                acl_metadata={"sender_addr": self.context.addr, "sender_id": self.context.aid, "reply_to": 1}
+                acl_metadata={
+                    "sender_addr": self.context.addr,
+                    "sender_id": self.context.aid,
+                    "reply_to": 1,
+                },
             )
 
     async def clear_market(self, market_products: list[MarketProduct]):
-        self.market_result, market_meta = self.marketconfig.market_mechanism(self, market_products)
+        self.market_result, market_meta = self.marketconfig.market_mechanism(
+            self, market_products
+        )
 
-        for agent, accepted_orderbook in groupby(self.market_result, lambda o: o['agent_id']):
+        for agent, accepted_orderbook in groupby(
+            self.market_result, lambda o: o["agent_id"]
+        ):
             addr, aid = agent
             meta = {"sender_addr": self.context.addr, "sender_id": self.context.aid}
 
             await self.context.send_acl_message(
                 {
-                    'context': 'clearing',
-                    'market': self.marketconfig.name,
-                    'orderbook': list(accepted_orderbook),
+                    "context": "clearing",
+                    "market": self.marketconfig.name,
+                    "orderbook": list(accepted_orderbook),
                 },
                 receiver_addr=addr,
                 receiver_id=aid,
@@ -294,5 +328,7 @@ class MarketRole(Role):
             )
 
         # clear_price = sorted(self.market_result, lambda o: o['price'])[0]
-        logger.info(f'clearing price for {self.marketconfig.name} is {market_meta["price"]}, volume: {market_meta["volume"]}')
+        logger.info(
+            f'clearing price for {self.marketconfig.name} is {market_meta["price"]}, volume: {market_meta["volume"]}'
+        )
         # TODO store metrics about latest clearing
