@@ -107,13 +107,13 @@ class BiddingRole(Role):
             1,  # register after time was updated for the first time
         )
 
-    def handle_opening(self, opening: OpeningMessage, meta):
+    def handle_opening(self, opening: OpeningMessage, meta: dict[str, str]):
         logger.debug(f'Received opening from: {opening["market"]} {opening["start"]}.')
         logger.debug(f'can bid until: {opening["stop"]}')
 
         self.context.schedule_instant_task(coroutine=self.set_bids(opening))
 
-    def handle_market_result(self, content, meta):
+    def handle_market_result(self, content: ClearingMessage, meta: dict[str, str]):
         logger.debug(f"got market result: {content}")
         orderbook: Orderbook = content["orderbook"]
         for bid in orderbook:

@@ -2,13 +2,15 @@ import logging
 from datetime import datetime, timedelta
 from itertools import groupby
 from operator import itemgetter
-from math import isclose
+from math import isclose, log10
 from typing import TypedDict
 
 from dateutil import relativedelta, rrule
 from marketconfig import MarketConfig, MarketProduct, MarketOrderbook, Orderbook, Order
 
 from mango import Role
+
+from market_mechanisms import available_strategies
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,18 @@ def is_mod_close(a, mod_b):
     return isclose(a % mod_b, 0, abs_tol=abs_tol) or isclose(
         a % mod_b, mod_b, abs_tol=abs_tol
     )
+
+
+def round_digits(n, tick_size):
+    """
+    rounds n to the power of 10 of the needed tick_size
+    Example_
+    >>> round_digits(1.100001, 0.1)
+    1.1
+    >>> round_digits(400.1, 20)
+    400
+    """
+    return round(n, 1-int(log10(tick_size)))
 
 
 class OpeningMessage(TypedDict):
@@ -73,82 +87,6 @@ orderbook: MarketOrderbook = {
 }
 
 
-class MarketRole(Role):
-    pass
-
-
-def cumsum(orderbook: Orderbook):
-    sum_ = 0
-    for order in orderbook:
-        sum_ += order["volume"]
-        order["cumsum"] = sum_
-    return orderbook
-
-
-def twoside_clearing(market_agent: MarketRole, market_products: list[MarketProduct]):
-    market_getter = itemgetter("start_time", "end_time", "only_hours")
-    accepted_orders = []
-    rejected_orders = []
-    for product, product_orders in groupby(market_agent.all_orders, market_getter):
-        if product not in market_products:
-            rejected_orders.extend(product_orders)
-            # logger.debug(f'found unwanted bids for {product} should be {market_products}')
-            continue
-        product_orders = list(product_orders)
-        bids = filter(lambda x: x["volume"] < 0, product_orders)
-        asks = filter(lambda x: x["volume"] > 0, product_orders)
-        # volume 0 is ignored/invalid
-
-        # generation
-        sorted_asks = sorted(asks, key=lambda i: i["price"])
-
-        # demand
-        sorted_bids = sorted(bids, key=lambda i: i["price"], reverse=True)
-
-        sorted_asks = cumsum(sorted_asks)
-        sorted_bids = cumsum(sorted_bids)
-
-        price, demand, i, j = 0, 0, 0, 0
-        intersection_found = False
-        for i in range(len(sorted_bids)):
-            total_vol = sorted_bids[i]["cumsum"]
-            # get first price to match demand (vol)
-            for j in range(len(sorted_asks)):
-                # gen = total_generation + sorted_asks[j]['volume']
-                if sorted_asks[j]["cumsum"] >= -demand:
-                    assert price <= sorted_asks[j]["price"], "wrong order"
-                    if sorted_asks[j]["price"] < sorted_bids[i]["price"]:
-                        # generation is cheaper than demand
-                        price = sorted_asks[j]["price"]
-                        demand = total_vol
-                    else:
-                        intersection_found = True
-                    break
-            if intersection_found:
-                break
-
-        accepted_orders.extend(sorted_bids[:i])
-        accepted_orders.extend(sorted_asks[:j])
-        rejected_orders.extend(sorted_bids[i:])
-        rejected_orders.extend(sorted_asks[j:])
-        if price == 0:
-            price = market_agent.marketconfig.maximum_bid
-    meta = {"volume": -demand, "price": price}
-    market_agent.all_orders = rejected_orders
-    # accepted orders can not be used in future
-
-    return accepted_orders, meta
-
-
-available_strategies = {
-    "one_side_market": "TODO",
-    "two_side_market": twoside_clearing,
-    "pay_as_bid": twoside_clearing,  # TODO
-    "pay_as_clear": twoside_clearing,
-    "nodal_market": "TODO",
-}
-
-
 def get_available_products(market_products: list[MarketProduct], startdate: datetime):
     options = []
     for product in market_products:
@@ -174,6 +112,7 @@ class MarketRole(Role):
     markets: list = []
 
     def __init__(self, marketconfig: MarketConfig):
+        super().__init__()
         if isinstance(marketconfig.market_mechanism, str):
             strategy = available_strategies.get(marketconfig.market_mechanism)
             if not strategy:
@@ -280,9 +219,12 @@ class MarketRole(Role):
                 assert is_mod_close(
                     order["volume"], self.marketconfig.amount_tick
                 ), "amount_tick"
+                order["volume"] = round_digits(order["volume"], self.marketconfig.amount_tick)
                 assert is_mod_close(
                     order["price"], self.marketconfig.price_tick
                 ), "price_tick"
+                order["price"] = round_digits(order["price"], self.marketconfig.price_tick)
+
                 assert order["price"] <= self.marketconfig.maximum_bid, "max_bid"
                 assert order["price"] >= self.marketconfig.minimum_bid, "min_bid"
                 assert (
