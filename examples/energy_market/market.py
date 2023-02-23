@@ -61,7 +61,7 @@ def aggregate_step_amount(orderbook: Orderbook):
             aggregation.append(volume)
 
 
-class BiddingRole(Role):
+class UnitsOperatorRole(Role):
     def __init__(self, available_markets: list[MarketConfig], volume=100, price=0.05):
         super().__init__()
         self.available_markets = available_markets
@@ -111,7 +111,7 @@ class BiddingRole(Role):
         logger.debug(f'Received opening from: {opening["market"]} {opening["start"]}.')
         logger.debug(f'can bid until: {opening["stop"]}')
 
-        self.context.schedule_instant_task(coroutine=self.set_bids(opening))
+        self.context.schedule_instant_task(coroutine=self.submit_bids(opening))
 
     def handle_market_result(self, content: ClearingMessage, meta: dict[str, str]):
         logger.debug(f"got market result: {content}")
@@ -119,22 +119,11 @@ class BiddingRole(Role):
         for bid in orderbook:
             self.valid_orders.append(bid)
 
-    async def set_bids(self, opening):
+    async def submit_bids(self, opening):
         products = opening["products"]
         market = self.registered_markets[opening["market"]]
         logger.debug(f"setting bids for {market.name}")
-        orderbook: Orderbook = []
-        for product in products:
-            price = self.context.price + 0.03 * self.context.price * np.random.random()
-            price = market.price_tick * round(price / market.price_tick)
-            order: Order = {}
-            order["start_time"] = product[0]
-            order["end_time"] = product[1]
-            order["only_hours"] = product[2]
-            order["agent_id"] = (self.context.addr, self.context.aid)
-            order["volume"] = self.volume
-            order["price"] = price
-            orderbook.append(order)
+        orderbook = await self.formulate_bids(market, products)
 
         acl_metadata = {
             "performative": Performatives.inform,
@@ -151,6 +140,22 @@ class BiddingRole(Role):
             receiver_id=market.aid,
             acl_metadata=acl_metadata,
         )
+
+    async def formulate_bids(self, market, products):
+        orderbook: Orderbook = []
+        for product in products:
+            price = self.context.price + 0.03 * self.context.price * np.random.random()
+            price = market.price_tick * round(price / market.price_tick)
+            order: Order = {}
+            order["start_time"] = product[0]
+            order["end_time"] = product[1]
+            order["only_hours"] = product[2]
+            order["agent_id"] = (self.context.addr, self.context.aid)
+            order["volume"] = self.volume
+            order["price"] = price
+            orderbook.append(order)
+
+        return orderbook
 
 
 first_after_start = rd(days=2, hour=0)
@@ -219,11 +224,11 @@ async def main(start):
 
     for i in range(4):
         agent = RoleAgent(c)
-        agent.add_role(BiddingRole(marketdesign, price=0.05 * (i % 9)))
+        agent.add_role(UnitsOperatorRole(marketdesign, price=0.05 * (i % 9)))
 
     for i in range(4):
         agent = RoleAgent(c)
-        agent.add_role(BiddingRole(marketdesign, price=5 * (i % 9), volume=-80))
+        agent.add_role(UnitsOperatorRole(marketdesign, price=5 * (i % 9), volume=-80))
 
     if isinstance(clock, ExternalClock):
         next_activity = clock.get_next_activity()
