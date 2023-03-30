@@ -204,7 +204,7 @@ class MarketRole(Role):
         agent = meta["sender_id"]
         agent_addr = meta["sender_addr"]
         # TODO allow accessing agents properties?
-        if self.marketconfig.eligable_obligations_lambda(agent):
+        if self.marketconfig.eligible_obligations_lambda(agent):
             self.registered_agents.append((agent_addr, agent))
 
     def handle_orderbook(self, content, meta):
