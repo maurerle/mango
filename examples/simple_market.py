@@ -38,7 +38,7 @@ class OneSidedMarketRole(Role):
             self, self.handle_message, lambda content, meta: isinstance(content, dict)
         )
         # market acts every 15 minutes
-        recurrency = rrule.rrule(rrule.MINUTELY, interval=15, dtstart=start)
+        recurrency = rrule.rrule(rrule.MINUTELY, interval=15, dtstart=start, cache=True)
         self.context.schedule_periodic_task(coroutine_func=self.clear_market, delay=900)
 
     async def clear_market(self):
@@ -63,7 +63,7 @@ class OneSidedMarketRole(Role):
         acl_metadata = {
             'performative': Performatives.inform,
             'sender_id': self.context.aid,
-            'sender_addr': self.context.addr,
+            'sender_addr': self._context.addr,
             'conversation_id': 'conversation01'
         }
         for receiver_addr, receiver_id in self.context.receiver_ids:
@@ -133,11 +133,11 @@ async def main(start):
     from mango.messages.codecs import JSON, PROTOBUF
 
     # works
-    addr = [('127.0.0.1', 5555), ('127.0.0.1', 5556)]
+    addr = [('127.0.0.1', 5555)]
     
     containers = []
     for ad in addr:
-        c = await create_container(addr=ad, clock=clock, codec=PROTOBUF(generic_serializer=True))
+        c = await create_container(addr=ad, clock=clock, codec=PROTOBUF(), copy_internal_messages=False)
         containers.append(c)
     market = RoleAgent(c)
     agents = []
@@ -146,7 +146,7 @@ async def main(start):
         ad = addr[i%len(addr)]
         c = containers[i%len(addr)]
         agent = RoleAgent(c)
-        agent.add_role(BiddingRole(market.context.addr, market.aid, price=0.05*(i%9)))
+        agent.add_role(BiddingRole(market._context.addr, market.aid, price=0.05*(i%9)))
         agents.append(agent)
         receiver_ids.append((ad, agent.aid))
     market.add_role(OneSidedMarketRole(demand=1000, receiver_ids=receiver_ids))
@@ -160,4 +160,14 @@ async def main(start):
 
 if __name__ == '__main__':
     start = parse('202301010000')
-    asyncio.run(main(start))
+
+    import uvloop
+    import sys
+
+    if sys.version_info >= (3, 11):
+        with asyncio.Runner(loop_factory=uvloop.new_event_loop) as runner:
+            runner.run(main(start))
+    else:
+        uvloop.install()
+        asyncio.run(main(start))
+    #asyncio.run(main(start))

@@ -178,7 +178,7 @@ async def main(start):
         ad = addr[i%len(addr)]
         c = containers[i%len(addr)]
         agent = RoleAgent(c)
-        agent.add_role(BiddingRole(market.context.addr, market.aid, price=0.05*(i%9)))
+        agent.add_role(BiddingRole(market._context.addr, market.aid, price=0.05*(i%9)))
         agents.append(agent)
         receiver_ids.append((ad, agent.aid))
 
@@ -186,7 +186,7 @@ async def main(start):
         ad = addr[i%len(addr)]
         c = containers[i%len(addr)]
         agent = RoleAgent(c)
-        agent.add_role(BiddingRole(market.context.addr, market.aid, volume=-80, price=0.03+0.05*(i%9)))
+        agent.add_role(BiddingRole(market._context.addr, market.aid, volume=-80, price=0.03+0.05*(i%9)))
         agents.append(agent)
         receiver_ids.append((ad, agent.aid))
     market.add_role(TwoSidedMarketRole(receiver_ids=receiver_ids))
@@ -201,4 +201,13 @@ async def main(start):
 
 if __name__ == '__main__':
     start = parse('202301010000')
-    asyncio.run(main(start))
+    #asyncio.run(main(start))
+    import sys
+    import uvloop
+
+    if sys.version_info >= (3, 11):
+        with asyncio.Runner(loop_factory=uvloop.new_event_loop) as runner:
+            runner.run(main(start))
+    else:
+        uvloop.install()
+        asyncio.run(main(start))
