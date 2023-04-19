@@ -79,7 +79,7 @@ class OneSidedMarketRole(Role):
         acl_metadata = {
             "performative": Performatives.inform,
             "sender_id": self.context.aid,
-            "sender_addr": self._context.addr,
+            "sender_addr": self.context.addr,
             "conversation_id": "conversation01",
         }
         for receiver_addr, receiver_id in self.context.receiver_ids:
@@ -175,9 +175,7 @@ async def main(start):
         ad = addr[i % len(addr)]
         c = containers[i % len(addr)]
         agent = RoleAgent(c)
-        agent.add_role(
-            BiddingRole(market._context.addr, market.aid, price=0.05 * (i % 9))
-        )
+        agent.add_role(BiddingRole(market.addr, market.aid, price=0.05 * (i % 9)))
         agents.append(agent)
         receiver_ids.append((ad, agent.aid))
     market.add_role(OneSidedMarketRole(demand=10000, receiver_ids=receiver_ids))
