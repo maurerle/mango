@@ -5,6 +5,7 @@ from dateutil import rrule
 
 from mango import Agent, create_container
 from mango.util.clock import ExternalClock
+from mango.util.distributed_clock import DistributedClockAgent, DistributedClockManager
 
 
 class Caller(Agent):
@@ -44,12 +45,27 @@ async def main(start):
     recurrency = rrule.rrule(rrule.MINUTELY, interval=15, dtstart=start)
 
     c = await create_container(addr=addr, clock=clock)
-    receiver = Receiver(c)
-    caller = Caller(c, addr, receiver.aid, recurrency)
+    same_process = True
+
+    clock_manager = DistributedClockManager(c, receiver_clock_addresses=[addr])
+
+    if same_process:
+        receiver = Receiver(c)
+        caller = Caller(c, addr, receiver.aid, recurrency)
+        clock_agent = DistributedClockAgent(c)
+    else:
+
+        def creator(container):
+            receiver = Receiver(container)
+            caller = Caller(container, addr, receiver.aid, recurrency)
+            clock_agent = DistributedClockAgent(container)
+
+        await c.as_agent_process(agent_creator=creator)
     if isinstance(clock, ExternalClock):
         for i in range(100):
             await asyncio.sleep(0.01)
             clock.set_time(clock.time + 60)
+            await clock_manager.distribute_time()
     await c.shutdown()
 
 
