@@ -57,7 +57,7 @@ class DistributedClockManager(ClockAgent):
 
     async def distribute_time(self):
         # wait until all jobs in other containers are finished
-        for container_id, fut in self.futures.items():
+        for container_id, fut in list(self.futures.items()):
             logger.debug("waiting for %s", container_id)
             # waits forever if manager was started first
             # as answer is never received
