@@ -8,6 +8,7 @@ from mango import Role, RoleAgent, create_container
 from mango.messages.message import Performatives
 from mango.util.clock import ExternalClock
 from mango.util.distributed_clock import DistributedClockAgent
+from serializer import mango_codec_factory
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,9 @@ class BiddingRole(Role):
         )
 
     def handle_message(self, content, meta):
+        print(content)
+        t = content["time"]
+        print(type(t))
         self.context.schedule_instant_task(coroutine=self.set_bids())
         print(self.context.current_timestamp)
 
@@ -86,6 +90,7 @@ async def main():
             "broker_addr": ("localhost", 1883, 60),
             "transport": "tcp",
         },
+        "codec": mango_codec_factory(),
     }
 
     c = await create_container(**container_kwargs)
