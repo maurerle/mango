@@ -56,20 +56,23 @@ class DistributedClockManager(ClockAgent):
         self.schedules = []
         await asyncio.sleep(0.01)
         # wait until all jobs in other containers are finished
-        for container_id, fut in self.futures.items():
+        for container_id, fut in list(self.futures.items()):
             logger.debug("waiting for %s", container_id)
             # waits forever if manager was started first
             # as answer is never received
             await fut
         # wait for our container too
         await self.wait_all_done()
-        if self._scheduler.clock.get_next_activity() is not None:
-            self.schedules.append(self._scheduler.clock.get_next_activity())
+        next_activity = self._scheduler.clock.get_next_activity()
+        
+        if next_activity is not None:
+            #logger.error(f"{next_activity}")
+            self.schedules.append(next_activity)
 
         if self.schedules:
             next_event = min(self.schedules)
         else:
-            logger.warning("no new events, time stands still")
+            logger.warning("%s: no new events, time stands still", self.aid)
             next_event = self._scheduler.clock.time
         logger.debug("next event at %s", next_event)
         self.schedule_instant_task(coroutine=self.broadcast(next_event))
