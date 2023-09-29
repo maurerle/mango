@@ -1,13 +1,13 @@
 [tool.poetry]
-name = "mango-agents"
-version = "1.1.1"
-description = "Modular Python Agent Framework"
-authors = ["Mango Developers <mango@offis.de>"]
+name = "mango-agents-assume"
+version = "1.1.1-1"
+description = "Modular Python Agent Framework - Temporary Fork of mango for development purpose"
+authors = ["Mango Developers <mango@offis.de>", "Florian Maurer <fmaurer@disroot.org>"]
 license = "LICENSE"
 readme = "readme.md"
 
-homepage = "https://gitlab.com/mango-agents/mango"
-repository = "https://gitlab.com/mango-agents/mango"
+homepage = "https://mango-agents.readthedocs.io/"
+repository = "https://gitlab.com/maurerle/mango"
 
 keywords = ["agent based simulation", "simulation"]
 
