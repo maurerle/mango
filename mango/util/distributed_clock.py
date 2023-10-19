@@ -53,8 +53,7 @@ class DistributedClockManager(ClockAgent):
         await super().shutdown()
 
     async def distribute_time(self):
-        self.schedules = []
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0)
         # wait until all jobs in other containers are finished
         for container_id, fut in list(self.futures.items()):
             logger.debug("waiting for %s", container_id)
@@ -76,6 +75,7 @@ class DistributedClockManager(ClockAgent):
             next_event = self._scheduler.clock.time
         logger.debug("next event at %s", next_event)
         self.schedule_instant_task(coroutine=self.broadcast(next_event))
+        self.schedules = []
         return next_event
 
 
