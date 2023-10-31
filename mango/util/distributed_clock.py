@@ -33,7 +33,8 @@ class DistributedClockManager(ClockAgent):
         if not self.futures[sender_addr].done():
             self.futures[sender_addr].set_result(True)
         else:
-            logger.warning("got another message from agent %s", sender_addr)
+            # with as_agent_process - messages can come from ourselves
+            logger.debug("got another message from agent %s - %s", sender_addr, content)
 
     async def broadcast(self, message, add_futures=True):
         for receiver_addr in self.receiver_clock_addresses:
