@@ -1,0 +1,54 @@
+[tool.poetry]
+name = "mango-agents"
+version = "1.1.1"
+description = "Modular Python Agent Framework"
+authors = ["Mango Developers <mango@offis.de>"]
+license = "LICENSE"
+readme = "readme.md"
+
+homepage = "https://mango-agents.readthedocs.io/"
+repository = "https://gitlab.com/mango-agents/mango"
+
+keywords = ["agent based simulation", "simulation"]
+
+classifiers=[
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Framework :: AsyncIO",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+packages = [
+    { include="mango", from="." },
+]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+paho-mqtt = "^1.5.1"
+dill = ">=0.3.6"
+msgspec = ">=0.14.2"
+protobuf = "^3.20.3"
+python-dateutil = "^2.8.2"
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.3.0"
+isort = "^5.12.0"
+pytest = "^7.2.2"
+pytest-cov = "^4.1.0"
+pytest-asyncio = "^0.21.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest]
+testpaths = "tests"
+
+[tool.coverage.report]
+exclude_lines = ["if __name__ == .__main__.:"]
