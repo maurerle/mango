@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 from mango import Agent
+from mango.container.mqtt import MQTTContainer
 from .termination_detection import tasks_complete_or_sleeping
 logger = logging.getLogger(__name__)
 
@@ -26,13 +27,14 @@ class DistributedClockManager(ClockAgent):
 
         logger.debug("clockmanager: %s from %s", content, sender_addr)
         if content:
-            assert isinstance(content, float), f"{content} was {type(content)}"
+            assert isinstance(content, (float, int)), f"{content} was {type(content)}"
             self.schedules.append(content)
 
         if not self.futures[sender_addr].done():
             self.futures[sender_addr].set_result(True)
         else:
-            logger.warning("got another message from agent %s", sender_addr)
+            # with as_agent_process - messages can come from ourselves
+            logger.debug("got another message from agent %s - %s", sender_addr, content)
 
     async def broadcast(self, message, add_futures=True):
         for receiver_addr in self.receiver_clock_addresses:
@@ -53,26 +55,28 @@ class DistributedClockManager(ClockAgent):
         await super().shutdown()
 
     async def distribute_time(self):
-        self.schedules = []
-        await asyncio.sleep(0.01)
         # wait until all jobs in other containers are finished
-        for container_id, fut in self.futures.items():
+        for container_id, fut in list(self.futures.items()):
             logger.debug("waiting for %s", container_id)
             # waits forever if manager was started first
             # as answer is never received
             await fut
         # wait for our container too
         await self.wait_all_done()
-        if self._scheduler.clock.get_next_activity() is not None:
-            self.schedules.append(self._scheduler.clock.get_next_activity())
+        next_activity = self._scheduler.clock.get_next_activity()
+        
+        if next_activity is not None:
+            #logger.error(f"{next_activity}")
+            self.schedules.append(next_activity)
 
         if self.schedules:
             next_event = min(self.schedules)
         else:
-            logger.warning("no new events, time stands still")
+            logger.warning("%s: no new events, time stands still", self.aid)
             next_event = self._scheduler.clock.time
         logger.debug("next event at %s", next_event)
         self.schedule_instant_task(coroutine=self.broadcast(next_event))
+        self.schedules = []
         return next_event
 
 
@@ -91,8 +95,15 @@ class DistributedClockAgent(ClockAgent):
         else:
             assert isinstance(content, (int, float)), f"{content} was {type(content)}"
             self._scheduler.clock.set_time(content)
-
-            t = asyncio.create_task(self.wait_all_done())
+            async def wait_done():
+                if isinstance(self._context._container, MQTTContainer):
+                    # in MQTT the task is finished before other messages are handled
+                    # we do not wait and directly send back that we finished
+                    # we leave time so that incoming messages can start to be handled before
+                    # should be fixed by distributed termination detection
+                    await asyncio.sleep(0.05)
+                await self.wait_all_done()
+            t = asyncio.create_task(wait_done())
 
             def respond(fut: asyncio.Future = None):
                 if self.stopped.done():
