@@ -30,14 +30,14 @@ class ExternalSchedulingContainerOutput:
 class ExternalSchedulingContainer(Container):
     """ """
 
-    clock: ExternalClock  # type hint
-
     def __init__(
         self,
         *,
         addr: str,
         codec: Codec,
         loop: asyncio.AbstractEventLoop,
+        clock: ExternalClock = None,
+        **kwargs,
     ):
         """
         Initializes a ExternalSchedulingContainer. Do not directly call this method but use
@@ -47,14 +47,16 @@ class ExternalSchedulingContainer(Container):
         :param loop: Current event loop
         proto as codec
         """
+        if not clock:
+            clock = ExternalClock()
 
-        clock = ExternalClock()
         super().__init__(
             addr=addr,
+            name=addr,
             codec=codec,
             loop=loop,
-            name=addr,
             clock=clock,
+            **kwargs,
         )
 
         self.running = True
