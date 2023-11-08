@@ -1,7 +1,7 @@
 dill==0.3.7
 msgspec==0.18.3
 paho-mqtt==1.6.1
-protobuf==3.20.3
+protobuf>=3.20.3
 python-dateutil==2.8.2
 six==1.16.0
 wheel==0.37.1
