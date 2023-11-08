@@ -8,6 +8,7 @@ from mango import Role, RoleAgent, create_container
 from mango.messages.message import Performatives
 from mango.util.clock import ExternalClock
 from mango.util.distributed_clock import DistributedClockAgent
+from serializer import mango_codec_factory
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,7 @@ async def main():
             "broker_addr": ("localhost", 1883, 60),
             "transport": "tcp",
         },
+        "codec": mango_codec_factory(),
     }
 
     c = await create_container(**container_kwargs)
