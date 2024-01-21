@@ -2,7 +2,7 @@ import pickle
 
 from mango.messages.codecs import JSON, GenericProtoMsg
 
-from datetime import datetime
+from datetime import datetime, UTC
 import calendar
 
 
@@ -12,7 +12,7 @@ def datetime_json_serializer():
         return calendar.timegm(dt.utctimetuple())
 
     def __fromstring__(dt: datetime):
-        return datetime.utcfromtimestamp(dt)
+        return datetime.fromtimestamp(dt, UTC)
 
     return datetime, __tostring__, __fromstring__
 
