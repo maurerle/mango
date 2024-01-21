@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "mango-agents-assume"
-version = "1.1.1-6"
+version = "1.1.1-7"
 description = "Modular Python Agent Framework - Temporary Fork of mango for development purpose"
 authors = ["Mango Developers <mango@offis.de>", "Florian Maurer <fmaurer@disroot.org>"]
 license = "LICENSE"

@@ -462,6 +462,8 @@ class Scheduler:
         :type coroutine: Coroutine
         :param timestamp: timestamp defining when the task should start (unix timestamp)
         :type timestamp: float
+        :param on_stop: coroutine to run on stop
+        :type on_stop: Object
         :param src: creator of the task
         :type src: Object
         """
@@ -481,6 +483,8 @@ class Scheduler:
 
         :param coroutine: coroutine to be scheduled
         :type coroutine:
+        :param on_stop: coroutine to run on stop
+        :type on_stop: Object
         :param src: creator of the task
         :type src: Object
         """
@@ -501,6 +505,8 @@ class Scheduler:
         :type coroutine_func:  Coroutine Function
         :param delay: delay in between the cycles
         :type delay: float
+        :param on_stop: coroutine to run on stop
+        :type on_stop: Object
         :param src: creator of the task
         :type src: Object
         """
@@ -524,6 +530,8 @@ class Scheduler:
         :type coroutine_func:  Coroutine Function
         :param recurrency: recurrency rule to calculate next event
         :type recurrency: dateutil.rrule.rrule
+        :param on_stop: coroutine to run on stop
+        :type on_stop: Object
         :param src: creator of the task
         :type src: Object
         """
@@ -554,6 +562,8 @@ class Scheduler:
         :type condition_func: lambda () -> bool
         :param lookup_delay: delay between checking the condition [s]
         :type lookup_delay: float
+        :param on_stop: coroutine to run on stop
+        :type on_stop: Object
         :param src: creator of the task
         :type src: Object
         """
@@ -572,12 +582,14 @@ class Scheduler:
     def schedule_awaiting_task(
         self, coroutine, awaited_coroutine, on_stop=None, src=None
     ):
-        """Schedule a task at specified datetime.
+        """Schedule a task after future of other task returned.
 
         :param coroutine: coroutine to be scheduled
         :type coroutine: Coroutine
-        :param date_time: datetime defining when the task should start
-        :type date_time: datetime
+        :param awaited_coroutine: datetime defining when the task should start
+        :type awaited_coroutine: asyncio.Future
+        :param on_stop: coroutine to run on stop
+        :type on_stop: Object
         :param src: creator of the task
         :type src: Object
         """

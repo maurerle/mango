@@ -268,6 +268,8 @@ class AgentDelegates:
         :type coroutine_creator:  Coroutine Function
         :param delay: delay in between the cycles
         :type delay: float
+        :param on_stop: coroutine to run on stop
+        :type on_stop: Object
         :param src: creator of the task
         :type src: Object
         """
@@ -282,6 +284,8 @@ class AgentDelegates:
         :type coroutine_func:  Coroutine Function
         :param delay: delay in between the cycles
         :type delay: float
+        :param on_stop: coroutine to run on stop
+        :type on_stop: Object
         :param src: creator of the task
         :type src: Object
         """
@@ -298,6 +302,8 @@ class AgentDelegates:
         :type coroutine_creator:  Coroutine Function
         :param recurrency: recurrency rule to calculate next event
         :type recurrency: dateutil.rrule.rrule
+        :param on_stop: coroutine to run on stop
+        :type on_stop: Object
         :param src: creator of the task
         :type src: Object
         """
@@ -317,6 +323,8 @@ class AgentDelegates:
         :type coroutine_creator:  Coroutine Function
         :param recurrency: recurrency rule to calculate next event
         :type recurrency: dateutil.rrule.rrule
+        :param on_stop: coroutine to run on stop
+        :type on_stop: Object
         :param src: creator of the task
         :type src: Object
         """
@@ -332,6 +340,8 @@ class AgentDelegates:
 
         :param coroutine_creator: coroutine_creator creating coroutine to be scheduled
         :type coroutine_creator:
+        :param on_stop: coroutine to run on stop
+        :type on_stop: Object
         :param src: creator of the task
         :type src: Object
         """
@@ -344,6 +354,8 @@ class AgentDelegates:
 
         :param coroutine: coroutine to be scheduled
         :type coroutine:
+        :param on_stop: coroutine to run on stop
+        :type on_stop: Object
         :param src: creator of the task
         :type src: Object
         """
