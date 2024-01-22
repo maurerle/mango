@@ -105,7 +105,7 @@ class NegotiationTerminationParticipantRole(Role):
         self.context.subscribe_message(
             self,
             self.handle_neg_msg,
-            lambda c, _: isinstance(c, dict) and "termination_weight" in c
+            lambda c, _: isinstance(c, dict) and "termination_weight" in c,
         )
 
     def on_send(
@@ -124,7 +124,6 @@ class NegotiationTerminationParticipantRole(Role):
         :param kwargs: additional parameters
         """
         if isinstance(content, self._negotiation_message_class):
-
             if content.negotiation_id not in self._weight_map:
                 self._weight_map[content.negotiation_id] = Fraction(0, 1)
             if not hasattr(content, "message_weight") or content.message_weight is None:
@@ -180,18 +179,16 @@ class NegotiationTerminationParticipantRole(Role):
         # reset weight
         self._weight_map[content.negotiation_id] = Fraction(0, 1)
         # Send weight
-        await (
-            self.context.send_acl_message(
-                content=TerminationMessage(
-                    current_weight, content.coalition_id, content.negotiation_id
-                ),
-                receiver_addr=termination_detector[0],
-                receiver_id=termination_detector[1],
-                acl_metadata={
-                    "sender_addr": self.context.addr,
-                    "sender_id": self.context.aid,
-                },
-            )
+        await self.context.send_acl_message(
+            content=TerminationMessage(
+                current_weight, content.coalition_id, content.negotiation_id
+            ),
+            receiver_addr=termination_detector[0],
+            receiver_id=termination_detector[1],
+            acl_metadata={
+                "sender_addr": self.context.addr,
+                "sender_id": self.context.aid,
+            },
         )
 
 

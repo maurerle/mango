@@ -4,6 +4,7 @@ import logging
 from mango import Agent
 from mango.container.mqtt import MQTTContainer
 from .termination_detection import tasks_complete_or_sleeping
+
 logger = logging.getLogger(__name__)
 
 
@@ -64,9 +65,9 @@ class DistributedClockManager(ClockAgent):
         # wait for our container too
         await self.wait_all_done()
         next_activity = self._scheduler.clock.get_next_activity()
-        
+
         if next_activity is not None:
-            #logger.error(f"{next_activity}")
+            # logger.error(f"{next_activity}")
             self.schedules.append(next_activity)
 
         if self.schedules:
@@ -95,6 +96,7 @@ class DistributedClockAgent(ClockAgent):
         else:
             assert isinstance(content, (int, float)), f"{content} was {type(content)}"
             self._scheduler.clock.set_time(content)
+
             async def wait_done():
                 if isinstance(self._context._container, MQTTContainer):
                     # in MQTT the task is finished before other messages are handled
@@ -103,6 +105,7 @@ class DistributedClockAgent(ClockAgent):
                     # should be fixed by distributed termination detection
                     await asyncio.sleep(0.05)
                 await self.wait_all_done()
+
             t = asyncio.create_task(wait_done())
 
             def respond(fut: asyncio.Future = None):
