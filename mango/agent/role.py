@@ -43,6 +43,9 @@ class DataContainer:
     def __getitem__(self, key):
         return self.__getattribute__(key)
 
+    def __setitem__(self, key, newvalue):
+        self.__setattr__(key, newvalue)
+
     def __contains__(self, key):
         return hasattr(self, key)
 
@@ -54,7 +57,8 @@ class DataContainer:
 
     def update(self, data: dict):
         for k, v in data.items():
-            self[k] = v
+            self.__setattr__(k, v)
+
 
 class RoleContext:
     pass

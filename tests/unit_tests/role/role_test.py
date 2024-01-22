@@ -100,3 +100,16 @@ def test_data_container():
     assert "abc" in data_container
     assert "cba" in data_container
     assert not "bca" in data_container
+
+def test_data_container():
+    # GIVEN
+    data_container = DataContainer()
+    data_container["abc"] = "123"
+    data_container.update({
+        "cba": 123
+    })
+
+    # WHEN THEN
+    assert data_container.cba == 123
+    assert data_container.get("abc") == "123"
+    assert data_container.get("bca") is None
