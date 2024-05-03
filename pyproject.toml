@@ -47,8 +47,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["mango"]
-include = ["."]
+include = ["mango"]
 
 [tool.isort]
 profile = "black"
