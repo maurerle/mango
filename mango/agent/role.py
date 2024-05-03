@@ -33,7 +33,7 @@ Furthermore there are two lifecycle methods to know about:
 """
 import asyncio
 from abc import ABC
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, Callable
 
 from mango.agent.core import Agent, AgentContext, AgentDelegates
 from mango.util.scheduling import Scheduler
@@ -126,6 +126,7 @@ class RoleHandler:
         self._role_model_type_to_subs = {}
         self._message_subs = []
         self._send_msg_subs = {}
+        self._role_event_type_to_handler = {}
         self._agent_context = agent_context
         self._scheduler = scheduler
         self._data = DataContainer()
@@ -177,6 +178,15 @@ class RoleHandler:
         """
         self._roles.append(role)
         self._role_to_active[role] = True
+
+    def remove_role(self, role: Role) -> None:
+        """Remove a given role
+
+        Args:
+            role ([type]): the role
+        """
+        self._roles.remove(role)
+        del self._role_to_active[role]
 
     @property
     def roles(self) -> List[Role]:
@@ -288,11 +298,22 @@ class RoleHandler:
             elif i == len(self._message_subs) - 1:
                 self._message_subs.append((role, message_condition, method, priority))
 
-    def subscribe_send(self, role, method):
+    def subscribe_send(self, role: Role, method: Callable):
         if role in self._send_msg_subs:
             self._send_msg_subs[role].append(method)
         else:
             self._send_msg_subs[role] = [method]
+
+    def emit_event(self, event: Any, event_source: Any = None):
+        subs = self._role_event_type_to_handler[type(event)]
+        for _, method in subs:
+            method(event, event_source)
+
+    def subscribe_event(self, role: Role, event_type: type, method: Callable):
+        if not event_type in self._role_event_type_to_handler:
+            self._role_event_type_to_handler[event_type] = []
+
+        self._role_event_type_to_handler[event_type] += [(role, method)]
 
 
 class RoleContext(AgentDelegates):
@@ -353,7 +374,20 @@ class RoleContext(AgentDelegates):
 
         :param role: the Role
         """
+        role.bind(self)
         self._role_handler.add_role(role)
+
+        # Setup role
+        role.setup()
+
+    def remove_role(self, role: Role):
+        """Remove a role and call on_stop for clean up
+
+        :param role: the role to remove
+        :type role: Role
+        """
+        self._role_handler.remove_role(role)
+        asyncio.create_task(role.on_stop())
 
     def handle_message(self, content, meta: Dict[str, Any]):
         """Handle an incoming message, delegating it to all applicable subscribers
@@ -397,6 +431,27 @@ class RoleContext(AgentDelegates):
             acl_metadata=acl_metadata,
             **kwargs
         )
+
+    def emit_event(self, event: Any, event_source: Any = None):
+        """Emit an custom event to other roles.
+
+        :param event: the event
+        :type event: Any
+        :param event_source: emitter of the event (mostly the emitting role), defaults to None
+        :type event_source: Any, optional
+        """
+        self._role_handler.emit_event(event, event_source)
+
+    def subscribe_event(self, role: Role, event_type: Any, handler_method: Callable):
+        """Subscribe to specific event types. The listener will be evaluated based
+        on their order of subscription
+
+        :param role: the role in which you want to handle the event
+        :type role: Role
+        :param event_type: the event type you want to handle
+        :type event_type: Any
+        """
+        self._role_handler.subscribe_event(role, event_type, handler_method)
 
     @property
     def addr(self):
@@ -448,11 +503,7 @@ class RoleAgent(Agent):
 
         :param role: the role to add
         """
-        role.bind(self._role_context)
         self._role_context.add_role(role)
-
-        # Setup role
-        role.setup()
 
     def remove_role(self, role: Role):
         """Remove a role permanently from the agent.
@@ -461,7 +512,6 @@ class RoleAgent(Agent):
         :type role: Role
         """
         self._role_context.remove_role(role)
-        asyncio.create_task(role.on_stop())
 
     @property
     def roles(self) -> List[Role]:
