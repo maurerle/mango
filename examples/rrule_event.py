@@ -60,7 +60,7 @@ async def main(start):
         # clock_agent = DistributedClockAgent(c)
         clock_manager = DistributedClockManager(c, receiver_clock_addresses=[])
     else:
-        clock_manager = DistributedClockManager(c, receiver_clock_addresses=[addr])
+        clock_manager = DistributedClockManager(c, receiver_clock_addresses=[(addr, "clock_agent")])
         # receiver = Receiver(c)
         # caller = Caller(c, addr, receiver.aid, recurrency)
         global receiver
