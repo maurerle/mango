@@ -35,7 +35,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://mango-agents.readthedocs.io/"
-Repository = "https://gitlab.com/maurerle/mango"
+Repository = "https://github.com/maurerle/mango"
 
 [project.optional-dependencies]
 dev = [

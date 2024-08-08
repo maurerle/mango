@@ -5,36 +5,38 @@ on:
     types: [published]
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.8'
-      - name: Install dependencies
-        run: |
-          pip install virtualenv
-          virtualenv venv
-          source venv/bin/activate
-          pip3 install -r requirements.txt
-          pip3 install -e .
-          sudo apt update
-          sudo apt install --assume-yes mosquitto
-          sudo service mosquitto start
-          pip3 install pytest
-          pip3 install coverage
-      - name: Test+Coverage
-        run: |
-          source venv/bin/activate
-          coverage run --source ./mango -m pytest
-          coverage report
+          python-version: '3.11'
       - name: Build package
         run: |
-          source venv/bin/activate
-          python setup.py sdist bdist_wheel
-      - name: Publish package
-        uses: pypa/gh-action-pypi-publish@v1
+          python -m pip install build
+          python -m build
+      - name: Store the distribution packages
+        uses: actions/upload-artifact@v4
         with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
+          name: python-package-distributions
+          path: dist/
+          
+  pypi-publish:
+    name: Upload release to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+      url: https://pypi.org/p/mango-agents-assume
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+    steps:
+    - name: Download all the dists
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish package distributions to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
