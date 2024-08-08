@@ -102,12 +102,12 @@ class DistributedClockAgent(ClockAgent):
             self._scheduler.clock.set_time(content)
 
             async def wait_done():
-                if isinstance(self._context._container, MQTTContainer):
-                    # in MQTT tasks are finished before incoming messages are handled
-                    # as we do not wait and directly send back that we finished.
-                    # Instead we should leave time so that we start handling incoming messages before.
-                    # This should be fixed properly by distributed termination detection
-                    await asyncio.sleep(0.05)
+                # handling the distributed clock message is finished before incoming messages
+                # as we do not wait, but directly send back that we finished.
+                # Instead we should leave time so that we start handling incoming messages before.
+                # This should be fixed properly by distributed termination detection
+                # Or through the usage of message priority.
+                await asyncio.sleep(0.05)
                 await self.wait_all_done()
 
             t = asyncio.create_task(wait_done())
