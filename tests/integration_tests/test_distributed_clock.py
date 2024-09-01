@@ -63,6 +63,9 @@ async def setup_and_run_test_case(connection_type, codec):
     # did work the second time too
     assert clock_ag.time == 1000
 
+    await clock_manager.shutdown()
+    await clock_agent.shutdown()
+
     # finally shut down
     await asyncio.gather(
         container_man.shutdown(),
@@ -76,5 +79,6 @@ async def test_tcp_json():
 
 
 @pytest.mark.asyncio
+@pytest.mark.mqtt
 async def test_mqtt_json():
     await setup_and_run_test_case("mqtt", JSON_CODEC)
