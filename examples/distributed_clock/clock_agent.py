@@ -46,9 +46,9 @@ class BiddingRole(Role):
         )
 
     def handle_message(self, content, meta):
-        print(content)
+        print("handle message", content)
         t = content["time"]
-        print(type(t))
+        print("scheduled task", self.context._scheduler.clock.time)
         self.context.schedule_instant_task(coroutine=self.set_bids())
         logger.debug("current_time %s", self.context.current_timestamp)
 

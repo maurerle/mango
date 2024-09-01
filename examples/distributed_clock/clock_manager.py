@@ -12,7 +12,6 @@ from mango.messages.message import Performatives
 from mango.util.clock import ExternalClock
 from mango.util.distributed_clock import DistributedClockManager
 from mango.util.termination_detection import tasks_complete_or_sleeping
-from serializer import mango_codec_factory
 
 logger = logging.getLogger(__name__)
 
