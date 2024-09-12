@@ -74,7 +74,11 @@ class OneSidedMarketRole(Role):
         resp = []
         for receiver_addr, receiver_id in self.receiver_ids:
             r = self.context.send_acl_message(
-                content={"message": f"Current time is {time}", "price": price},
+                content={
+                    "message": f"Current time is {time}",
+                    "price": price,
+                    "time": time,
+                },
                 receiver_addr=receiver_addr,
                 receiver_id=receiver_id,
                 acl_metadata=acl_metadata,
@@ -116,6 +120,7 @@ async def main(start):
             "broker_addr": ("localhost", 1883, 60),
             "transport": "tcp",
         },
+        "codec": mango_codec_factory(),
     }
 
     c = await create_container(**container_kwargs)

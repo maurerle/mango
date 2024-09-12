@@ -17,7 +17,7 @@ from ..util.multiprocessing import AioDuplex, PipeToWriteQueue, aioduplex
 logger = logging.getLogger(__name__)
 
 AGENT_PATTERN_NAME_PRE = "agent"
-WAIT_STEP = 0.01
+WAIT_STEP = 0.001
 
 
 class IPCEventType(enumerate):

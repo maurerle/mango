@@ -3,6 +3,7 @@ import logging
 from typing import TypedDict
 
 import numpy as np
+from serializer import mango_codec_factory
 
 from mango import Role, RoleAgent, create_container
 from mango.messages.message import Performatives
@@ -45,6 +46,9 @@ class BiddingRole(Role):
         )
 
     def handle_message(self, content, meta):
+        print("handle message", content)
+        t = content["time"]
+        print("scheduled task", self.context._scheduler.clock.time)
         self.context.schedule_instant_task(coroutine=self.set_bids())
         logger.debug("current_time %s", self.context.current_timestamp)
 
@@ -87,6 +91,7 @@ async def main():
             "broker_addr": ("localhost", 1883, 60),
             "transport": "tcp",
         },
+        "codec": mango_codec_factory(),
     }
 
     c = await create_container(**container_kwargs)

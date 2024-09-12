@@ -15,6 +15,9 @@ from mango.util.scheduling import (
     TimestampScheduledTask,
 )
 
+# this removes multiprocessing warning but breaks pickling of enum in other tests
+# multiprocessing.set_start_method("spawn", force=True)
+
 
 @pytest.mark.asyncio
 async def test_recurrent():

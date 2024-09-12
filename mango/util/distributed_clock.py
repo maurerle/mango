@@ -14,7 +14,7 @@ class ClockAgent(Agent):
 
 
 class DistributedClockManager(ClockAgent):
-    def __init__(self, container, receiver_clock_addresses: list):
+    def __init__(self, container, receiver_clock_addresses: list[tuple]):
         super().__init__(container, "clock")
         self.receiver_clock_addresses = receiver_clock_addresses
         self.schedules = []
@@ -145,6 +145,7 @@ class DistributedClockManager(ClockAgent):
 
         Args:
             time (number, optional): The new time which is set. Defaults to None.
+
         Returns:
             number or None: The time at which the next event happens
         """
