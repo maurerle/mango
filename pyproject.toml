@@ -3,8 +3,8 @@ requires = ["setuptools>=60", "setuptools-scm>=8.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mango-agents"
-#version = "1.1.4"
+name = "mango-agents-assume"
+#version = "1.1.4-11"
 dynamic = ["version"]
 description = "Modular Python Agent Framework - Temporary Fork of mango for development purpose"
 authors = [{name="Mango Developers", email="mango@offis.de"}, {name="Florian Maurer", email="fmaurer@disroot.org"}]
@@ -39,7 +39,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://mango-agents.readthedocs.io/"
-Repository = "https://github.com/OFFIS-DAI/mango"
+Repository = "https://github.com/maurerle/mango"
 
 [project.optional-dependencies]
 dev = [
