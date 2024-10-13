@@ -23,7 +23,7 @@ A detailed documentation for this project can be found at [mango-agents.readthed
 
 ## Installation
 
-*mango* requires Python >= 3.8 and runs on Linux, OSX and Windows.
+*mango* requires Python >= 3.9 and runs on Linux, OSX and Windows.
 
 For installation of mango you should use
 [virtualenv](https://virtualenv.pypa.io/en/latest/#) which can create isolated Python environments for different projects.
