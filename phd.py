@@ -17,7 +17,7 @@ rename = {
     "distribute_ping_pong_test": "direct ping pong"
 }
 
-EXEC_RUNTIME_STUDY = False
+EXEC_RUNTIME_STUDY = True
 
 if EXEC_RUNTIME_STUDY:
     for func in [distribute_ping_pong_test, distribute_ping_pong_test_timestamp]:
