@@ -1,20 +1,25 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "setuptools-scm>=8.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "mango-agents"
-version = "2.1.0"
-authors = [
-  { name="mango Team", email="mango@offis.de" },
-]
-description = "Modular Python Agent Framework"
+#version = "2.1.0-1"
+dynamic = ["version"]
+authors = [{name="mango Team", email="mango@offis.de"}, {name="Florian Maurer", email="fmaurer@disroot.org"}]
+description = "Modular Python Agent Framework - Temporary Fork of mango for development purpose"
 readme = "readme.md"
 requires-python = ">=3.10"
-classifiers = [
+
+classifiers=[
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Framework :: AsyncIO",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -23,6 +28,8 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 license = {file="LICENSE"}
+keywords = ["agent based simulation", "simulation"]
+
 dependencies = [
     "paho-mqtt>=2.1.0",
     "python-dateutil>=2.9.0",
@@ -30,6 +37,7 @@ dependencies = [
     "protobuf==5.27.2",
     "networkx>=3.4.1"
 ]
+
 
 [project.optional-dependencies]
 fastjson = [
@@ -48,14 +56,22 @@ Repository = "https://github.com/OFFIS-DAI/mango"
 Issues = "https://github.com/OFFIS-DAI/mango/issues"
 
 
+[tool.pytest]
+testpaths = "tests"
+
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
 markers = [
     "mqtt",
 ]
 
+[tool.coverage.report]
+exclude_lines = ["if __name__ == .__main__.:"]
+
 [tool.coverage.run]
 omit = ["tests/*"]
+
+[tool.setuptools_scm]
 
 [tool.ruff.lint]
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
