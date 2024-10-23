@@ -196,14 +196,14 @@ class RoleHandler:
             for role in self.roles:
                 role.handle_message(content, meta)
 
-    def _notify_send_message_subs(self, content, receiver_addr: AgentAddress, **kwargs):
+    def _notify_send_message_subs(self, content, receiver_addr: AgentAddress, additional_arguments: dict):
         for role in self._send_msg_subs:
             for sub in self._send_msg_subs[role]:
                 if self._is_role_active(role):
                     sub(
                         content=content,
                         receiver_addr=receiver_addr,
-                        **kwargs,
+                        additional_arguments=additional_arguments,
                     )
 
     def subscribe_message(self, role, method, message_condition, priority=0):
@@ -347,12 +347,13 @@ class RoleContext(AgentDelegates):
         receiver_addr: AgentAddress,
         **kwargs,
     ) -> bool:
-        self._role_handler._notify_send_message_subs(content, receiver_addr, **kwargs)
+        additional_arguments = kwargs
+        self._role_handler._notify_send_message_subs(content, receiver_addr, additional_arguments)
         return await self.context.send_message(
             content=content,
             receiver_addr=receiver_addr,
             sender_id=self.aid,
-            **kwargs,
+            **additional_arguments,
         )
 
     def emit_event(self, event: Any, event_source: Any = None):
