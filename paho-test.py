@@ -3,15 +3,12 @@
 This script was used to debug a weird behavior in paho.mqtt.python
 See https://github.com/eclipse-paho/paho.mqtt.python/issues/874
 
-When setting WAIT_FOR_PUBLISH=False and myQOS = 1 everything works as expected
-With WAIT_FOR_PUBLISH=True, the script deadlocks for some reason.
-With myQOS = 0 the messages are not received in the expected order.
-myQOS = 1 fixes this.
-
+This script works fine with WAIT_FOR_PUBLISH either True or False and with
+myQOS = 0 or 1.
 Having myQOS set to 1 has a delay of 40ms per call, if TCP_NODELAY is not set on the MQTT broker.
 This can be set through the `set_tcp_nodelay=true` config in mosquitto.conf
 
-See paho-test.py for an implementation of similar behavior without deadlock.
+See paho-sub.py for an implementation of similar behavior which somehow deadlocks.
 """
 import logging
 import random
@@ -21,10 +18,10 @@ import paho.mqtt.client as paho
 
 logger = logging.getLogger(__name__)
 
-WAIT_FOR_PUBLISH = False
-myQOS = 1
+WAIT_FOR_PUBLISH = True
+myQOS = 0
 broker = "localhost"
-port = 1884
+port = 1883
 topic = "python/mqtt"
 # Generate a Client ID with the publish prefix.
 client_id = f"publish-{random.randint(0, 1000)}"
@@ -38,18 +35,27 @@ def connect_mqtt(topic):
         else:
             logger.error("Failed to connect, return code %d\n", rc)
         
-    def thread_publish(client, topic, payload):
-        info = client.publish("no topic", payload, qos=myQOS)
+    def thread_publish(client, topic, payload: int):
+        number = int(payload) + 1
+        if number < 100:
+            info = client.publish(topic, number, qos=myQOS)
+            logger.info("did send message %s", number)
         # wait for publish does deadlock here
         if WAIT_FOR_PUBLISH:
             info.wait_for_publish()
 
     def on_message(client, userdata, message: paho.MQTTMessage):
         logger.info("got message %s", message.payload)
-        # create a thread pool where we submit the publishing
-        # and wait for the result
-        pool.apply(thread_publish, args=(client, topic, message.payload))
-        #info = client.publish("no topic", message.payload, qos=myQOS)
+        
+        payload = message.payload
+        # using a threadpool here did not help either
+        # pool.apply(thread_publish, args=(client, topic, message.payload))
+        number = int(payload) + 1
+        if number < 100:
+            info = client.publish(topic, number, qos=myQOS)
+            # wait for publish does deadlock here
+            #info.wait_for_publish()
+            logger.info("did send message %s", number)
 
     client = paho.Client(paho.CallbackAPIVersion.VERSION2, client_id)
     client.on_connect = on_connect
@@ -60,29 +66,12 @@ def connect_mqtt(topic):
     return client
 
 
-def publish(client, topic, max_count=100):
-    msg_count = 1
-    while True:
-        msg = f"messages: {msg_count}"
-        result = client.publish(topic, msg, qos=myQOS)
-        result.wait_for_publish()
-        # result: [0, 1]
-        status = result[0]
-        if status == 0:
-            logger.info("Send `%s` to topic `%s`", msg, topic)
-        else:
-            print(f"Failed to send message to topic {topic}")
-        msg_count += 1
-        if msg_count > max_count:
-            break
-
-
 def run():
     client = connect_mqtt(topic)
     client.loop_start()
-    #client.subscribe("no topic")
 
-    publish(client, topic)
+    result = client.publish(topic, 1, qos=myQOS)
+    result.wait_for_publish()
 
     # this helps when QoS is 0 to wait until all is received
     import time
