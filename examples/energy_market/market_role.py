@@ -1,16 +1,14 @@
 import logging
 from datetime import datetime, timedelta
 from itertools import groupby
-from operator import itemgetter
 from math import isclose, log10
 from typing import TypedDict
 
-from dateutil import relativedelta, rrule
-from marketconfig import MarketConfig, MarketProduct, MarketOrderbook, Orderbook, Order
+from dateutil import rrule
+from market_mechanisms import available_strategies
+from marketconfig import MarketConfig, MarketOrderbook, MarketProduct, Order, Orderbook
 
 from mango import Role
-
-from market_mechanisms import available_strategies
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +33,7 @@ def round_digits(n, tick_size):
     >>> round_digits(400.1, 20)
     400
     """
-    return round(n, 1-int(log10(tick_size)))
+    return round(n, 1 - int(log10(tick_size)))
 
 
 class OpeningMessage(TypedDict):
@@ -149,7 +147,7 @@ class MarketRole(Role):
         self.context.subscribe_message(
             self,
             self.handle_registration,
-            accept_registration
+            accept_registration,
             # TODO safer type check? dataclass?
         )
         current = datetime.fromtimestamp(self.context.current_timestamp)
@@ -219,11 +217,15 @@ class MarketRole(Role):
                 assert is_mod_close(
                     order["volume"], self.marketconfig.amount_tick
                 ), "amount_tick"
-                order["volume"] = round_digits(order["volume"], self.marketconfig.amount_tick)
+                order["volume"] = round_digits(
+                    order["volume"], self.marketconfig.amount_tick
+                )
                 assert is_mod_close(
                     order["price"], self.marketconfig.price_tick
                 ), "price_tick"
-                order["price"] = round_digits(order["price"], self.marketconfig.price_tick)
+                order["price"] = round_digits(
+                    order["price"], self.marketconfig.price_tick
+                )
 
                 assert order["price"] <= self.marketconfig.maximum_bid, "max_bid"
                 assert order["price"] >= self.marketconfig.minimum_bid, "min_bid"

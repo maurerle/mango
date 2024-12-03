@@ -1,11 +1,14 @@
-from mango import Agent, Role
+import logging
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from typing import TypedDict
+
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-import logging
-from dataclasses import dataclass, field
-from typing import Callable, TypedDict
 from numpy.typing import ArrayLike
+
+from mango import Agent, Role
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +28,7 @@ MarketOrderbook = dict[str, Orderbook]
 contracttype = Callable[[Agent, Agent], None]
 marketcontracttype = Callable[[Agent, Agent, ArrayLike], None]
 eligible_lambda = Callable[Agent, bool]
+
 
 # describes the configuration of an actual product traded at the market
 @dataclass
@@ -46,9 +50,9 @@ class MarketProduct:
         rd()
     )  # when does the first delivery begin, in relation to market start
     # this should be a multiple of duration
-    only_hours: tuple[
-        int, int
-    ] | None = None  # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
+    only_hours: tuple[int, int] | None = (
+        None  # e.g. (8,20) - for peak trade, (20, 8) for off-peak, none for base
+    )
     eligible_lambda_function: eligible_lambda | None = None
 
 
@@ -193,6 +197,7 @@ epex_intraday_auction_config = MarketConfig(
 # 15m IDM auction 5000€/a
 # https://www.epexspot.com/en/downloads#rules-fees-processes
 
+
 # Trading should start at 15:00
 def dynamic_end(current_time: datetime):
     if current_time.hour < 15:
@@ -288,6 +293,7 @@ eex_future_trading_config = MarketConfig(
 # AfterMarket:
 # https://www.epexspot.com/en/tradingproducts#after-market-trading
 NOW = datetime.now()
+
 
 # Trading end should be 12:30 day after delivery (D+1) - dynamic repetition makes it possible
 def dynamic_repetition(current_time):

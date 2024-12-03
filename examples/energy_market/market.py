@@ -1,25 +1,24 @@
 import asyncio
+import logging
 from datetime import datetime, timedelta
-from dateutil import rrule as rr
-from dateutil.relativedelta import relativedelta as rd
-from marketconfig import MarketConfig, MarketProduct
 
 import numpy as np
+from dateutil import rrule as rr
+from dateutil.relativedelta import relativedelta as rd
+from market_role import (
+    ClearingMessage,
+    MarketRole,
+    OpeningMessage,
+    Order,
+    Orderbook,
+)
+from marketconfig import MarketConfig, MarketProduct
 from tqdm import tqdm
 
 from mango import Role, RoleAgent, create_container
-from mango.messages.message import Performatives
 from mango.container.core import Container
+from mango.messages.message import Performatives
 from mango.util.clock import ExternalClock
-from market_role import (
-    MarketRole,
-    MarketOrderbook,
-    Order,
-    Orderbook,
-    OpeningMessage,
-    ClearingMessage,
-)
-import logging
 
 logger = logging.getLogger(__name__)
 

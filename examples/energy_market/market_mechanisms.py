@@ -1,11 +1,8 @@
-
 import logging
-from datetime import datetime, timedelta
 from itertools import groupby
 from operator import itemgetter
 
-from dateutil import relativedelta, rrule
-from marketconfig import MarketConfig, MarketProduct, MarketOrderbook, Orderbook, Order
+from marketconfig import MarketProduct, Order, Orderbook
 
 from mango import Role
 
@@ -101,10 +98,10 @@ def pay_as_bid(market_agent: Role, market_products: list[MarketProduct]):
             min_len = min(len(sorted_asks, len(sorted_bids)))
             i = 0
             for i in range(min_len):
-                if sorted_asks[i]['price'] <= sorted_bids[i]['price']:
+                if sorted_asks[i]["price"] <= sorted_bids[i]["price"]:
                     # pay as bid - so the generator gets payed more than he needed to operate
-                    sorted_asks[i]['price'] = sorted_bids[i]['price']
-                    sorted_asks[i]['price']
+                    sorted_asks[i]["price"] = sorted_bids[i]["price"]
+                    sorted_asks[i]["price"]
                 else:
                     # as we have sorted before, the other bids/asks can't be matched either
                     # once we get here
@@ -115,8 +112,10 @@ def pay_as_bid(market_agent: Role, market_products: list[MarketProduct]):
             rejected_orders.extend(sorted_bids[i:])
             rejected_orders.extend(sorted_asks[j:])
 
-    price = sum(map(lambda order: order['price'], accepted_orders))/len(accepted_orders)
-    volume = sum(map(lambda order: order['volume'], accepted_orders))
+    price = sum(map(lambda order: order["price"], accepted_orders)) / len(
+        accepted_orders
+    )
+    volume = sum(map(lambda order: order["volume"], accepted_orders))
     # TODO price and volume is wrong if multiple products exist
     if price == 0:
         price = market_agent.marketconfig.maximum_bid
@@ -125,6 +124,7 @@ def pay_as_bid(market_agent: Role, market_products: list[MarketProduct]):
     # accepted orders can not be used in future
 
     return accepted_orders, meta
+
 
 # with partial accepted bids
 def pay_as_bid_partial(market_agent: Role, market_products: list[MarketProduct]):
@@ -207,8 +207,10 @@ def pay_as_bid_partial(market_agent: Role, market_products: list[MarketProduct])
                 for ask in to_commit:
                     ask["price"] = bid["price"]
 
-    price = sum(map(lambda order: order['price'], accepted_orders))/len(accepted_orders)
-    volume = sum(map(lambda order: order['volume'], accepted_orders))
+    price = sum(map(lambda order: order["price"], accepted_orders)) / len(
+        accepted_orders
+    )
+    volume = sum(map(lambda order: order["volume"], accepted_orders))
     # TODO price and volume is wrong if multiple products exist
     if price == 0:
         price = market_agent.marketconfig.maximum_bid
@@ -217,6 +219,7 @@ def pay_as_bid_partial(market_agent: Role, market_products: list[MarketProduct])
     # accepted orders can not be used in future
 
     return accepted_orders, meta
+
 
 # 1. multi-stage market -> clears locally, rejected_bids are pushed up a layer
 # 2. nodal pricing -> centralized market which handles different node_ids different - can also be used for country coupling

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 ## Simple electricity market examples
 #
 # This Jupyter notebook is meant for teaching purposes. To use it, you need to install a Python environment with Jupyter notebooks, and the Python for Power System Analysis (PyPSA) library. See
@@ -15,13 +14,15 @@
 #
 # Here libraries are imported and data is defined.
 
-import numpy as np
 
+from datetime import date, timedelta
+
+import pandas as pd
 import pypsa
 
-from datetime import datetime, date, timedelta
-import pandas as pd
-snapshots = list(pd.date_range(start =date.today()-timedelta(days=1),end =date.today(), freq ='1H'))
+snapshots = list(
+    pd.date_range(start=date.today() - timedelta(days=1), end=date.today(), freq="1H")
+)
 
 # marginal costs in EU
 marginal_costs = {"Wind": 0, "Hydro": 0, "Coal": 30, "Gas": 60, "Oil": 80}
@@ -47,7 +48,7 @@ transmission = {
 # country electrical loads in MW (not necessarily realistic)
 loads = {"South Africa": 42000, "Mozambique": 650, "Swaziland": 250}
 df = pd.DataFrame(loads, index=snapshots)
-df['Swaziland'].iloc[8:17] *=3
+df["Swaziland"].iloc[8:17] *= 3
 loads = df
 ### Single bidding zone with fixed load, one period
 #
@@ -58,20 +59,20 @@ loads = df
 country = "South Africa"
 
 network = pypsa.Network()
-network.snapshots=snapshots
+network.snapshots = snapshots
 network.add("Bus", country)
 
 for tech in power_plant_p_nom[country]:
     network.add(
         "Generator",
-        "{} {}".format(country, tech),
+        f"{country} {tech}",
         bus=country,
         p_nom=power_plant_p_nom[country][tech],
         marginal_cost=marginal_costs[tech],
     )
 
 
-network.add("Load", "{} load".format(country), bus=country, p_set=loads[country])
+network.add("Load", f"{country} load", bus=country, p_set=loads[country])
 
 # Run optimisation to determine market dispatch
 network.lopf()
@@ -90,23 +91,22 @@ network.buses_t.marginal_price
 # In this example we have bidirectional transmission capacity between two bidding zones. The power transfer is treated as controllable (like an A/NTC (Available/Net Transfer Capacity) or HVDC line). Note that in the physical grid, power flows passively according to the network impedances.
 
 network = pypsa.Network()
-network.snapshots=snapshots
+network.snapshots = snapshots
 countries = ["Mozambique", "South Africa", "Swaziland"]
 
 for country in countries:
-
     network.add("Bus", country)
 
     for tech in power_plant_p_nom[country]:
         network.add(
             "Generator",
-            "{} {}".format(country, tech),
+            f"{country} {tech}",
             bus=country,
             p_nom=power_plant_p_nom[country][tech],
             marginal_cost=marginal_costs[tech],
         )
 
-    network.add("Load", "{}d load".format(country), bus=country, p_set=loads[country])
+    network.add("Load", f"{country}d load", bus=country, p_set=loads[country])
 
     # add transmission as controllable Link
     if country not in transmission:
@@ -120,7 +120,7 @@ for country in countries:
         # to allow bidirectional (i.e. also negative) flow
         network.add(
             "Link",
-            "{} - {} link".format(country, other_country),
+            f"{country} - {other_country} link",
             bus0=country,
             bus1=other_country,
             p_nom=transmission[country][other_country],
