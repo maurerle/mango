@@ -177,8 +177,9 @@ if __name__ == "__main__":
 
     if EXEC_RUNTIME_STUDY:
         results = []
-        for func_type in ["ping_pong","timestamp"]:
+        for func_type in ["ping_pong", "timestamp"]:
             for connection_type in ["mqtt", "tcp"]:
+                # sudo chmod 777 /tmp/mqtt.sock
                 for transport in ["tcp", "websockets", "unix"]:
                     if connection_type == "tcp" and transport != "tcp":
                         continue
@@ -198,8 +199,15 @@ if __name__ == "__main__":
                         800,
                         900,
                         1000,
-                        #5000,
-                        #10000,
+                        2000,
+                        3000,
+                        4000,
+                        5000,
+                        6000,
+                        7000,
+                        8000,
+                        9000,
+                        10000,
                     ]:
                         t = time.time()
                         asyncio.run(func(func_type, connection_type, transport=transport, max_count=max_count))
@@ -213,13 +221,14 @@ if __name__ == "__main__":
         df = pd.DataFrame(results, columns=["function", "connection_type", "transport", "count", "duration"])
         df["roundtrip_per_second"] = df["count"] / df["duration"]
         print(df)
-        df.to_csv("runtime.csv", index=None)
+        df.to_csv("benchmark.csv", index=False)
 
     SAVE_FIG = True
 
     if SAVE_FIG:
         import matplotlib.pyplot as plt
-        df = pd.read_csv("runtime.csv")
+        df = pd.read_csv("benchmark.csv")
+        # df = df[df.transport == "tcp"]
         pivot_df = df.pivot(columns=["function", "connection_type", "transport"], index="count")
         # substract duration with 1 message (shows overhead)
         startup_duration = pivot_df["duration"].loc[1]
@@ -231,13 +240,20 @@ if __name__ == "__main__":
         pivot_df["roundtrip_per_second"] = inverse_df
         # remove index=1 which is infinity
         pivot_df = pivot_df.drop(1)
-        df[df.connection_type == "mqtt"]
-        pivot_df["roundtrip_per_second"][pivot_df.index <= 1000].plot(
+        pivot_df["roundtrip_per_second"].plot(
             figsize=(10, 5), grid=True
         )
         plt.ylabel("roundtrips per second")
         plt.title("roundtrips by technology and method")
         plt.savefig("roundtrip_per_seconds.svg")
+        
+        (pivot_df["duration"]).plot(figsize=(10, 5), grid=True)
+        legende = []
+        for k, v in pivot_df["roundtrip_per_second"].iloc[-1].items():
+            legende.append(f"{k[0]} {k[1]} {int(v)} rts/s")
 
-        pivot_df["duration"].plot(figsize=(10, 5), grid=True)
+        legend = plt.legend(legende, title="method connection roundtrips/sec")
+
+        plt.ylabel("runtime in s")
+        plt.xlabel("number of roundtrips")
         plt.savefig("duration.svg")

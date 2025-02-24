@@ -92,33 +92,34 @@ if SAVE_FIG:
     plt.savefig("duration.svg")
 
 
-# Function to create LaTeX table from Series with MultiIndex
-def series_to_latex(series):
-    latex_table = "\\begin{table}[h]\n\\centering\n\\begin{tabular}{lll}\n\\hline\n"
-    latex_table += "\\textbf{Function} & \\textbf{Connection Type} & \\textbf{Value} \\\\\n\\hline\n"
+    # Function to create LaTeX table from Series with MultiIndex
+    def series_to_latex(series):
+        latex_table = "\\begin{table}[h]\n\\centering\n\\begin{tabular}{lll}\n\\hline\n"
+        latex_table += "\\textbf{Function} & \\textbf{Connection Type} & \\textbf{Value} \\\\\n\\hline\n"
 
-    current_function = ""
-    for (function, connection_type), value in series.items():
-        if function != current_function:
-            if current_function:
-                latex_table += "\\hline\n"
-            latex_table += f"\\multirow{{2}}{{*}}{{{function}}} & {connection_type} & {value:.6f} \\\\\n"
-            current_function = function
-        else:
-            latex_table += f" & {connection_type} & {value:.6f} \\\\\n"
+        current_function = ""
+        for (function, connection_type), value in series.items():
+            if function != current_function:
+                if current_function:
+                    latex_table += "\\hline\n"
+                latex_table += f"\\multirow{{2}}{{*}}{{{function}}} & {connection_type} & {value:.6f} \\\\\n"
+                current_function = function
+            else:
+                latex_table += f" & {connection_type} & {value:.6f} \\\\\n"
 
-    latex_table += "\\hline\n\\end{tabular}\n"
-    latex_table += "\\caption{Function and Connection Type Data}\n"
-    latex_table += "\\label{tab:startup_duration}\n"
-    latex_table += "\\end{table}"
+        latex_table += "\\hline\n\\end{tabular}\n"
+        latex_table += "\\caption{Function and Connection Type Data}\n"
+        latex_table += "\\label{tab:startup_duration}\n"
+        latex_table += "\\end{table}"
 
-    return latex_table
+        return latex_table
 
 
-# Generate and print the LaTeX table
-latex_output = series_to_latex(startup_duration)
-print(latex_output)
+    # Generate and print the LaTeX table
 
-# Optionally, save to a file
-with open("startup_duration.tex", "w") as f:
-    f.write(latex_output)
+    latex_output = series_to_latex(startup_duration)
+    print(latex_output)
+
+    # Optionally, save to a file
+    with open("startup_duration.tex", "w") as f:
+        f.write(latex_output)
